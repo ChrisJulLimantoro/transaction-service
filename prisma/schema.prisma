@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category{
+  id          String @id @db.Uuid @default(uuid())
+  code        String
+  name        String
+  company_id  String @db.Uuid
+
+  types Type[]
+  company Company @relation(fields: [company_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("categories")
+  @@index([deleted_at])
+}
+
+model Type{
+  id          String @id @db.Uuid @default(uuid())
+  code        String
+  name        String
+  category_id String @db.Uuid
+
+  category Category @relation(fields: [category_id], references: [id])
+  products Product[]
+  prices Price[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("types")
+  @@index([deleted_at])
+}
+
+model Product{
+  id          String @id @db.Uuid @default(uuid())
+  code        String
+  name        String
+  fixed_price  Decimal @db.Decimal
+  status      Int // 0: Inactive, 1: Active, 2: Sold Out
+  type_id     String @db.Uuid
+  store_id    String @db.Uuid
+
+  type Type @relation(fields: [type_id], references: [id])
+  store Store @relation(fields: [store_id], references: [id])
+  product_codes ProductCode[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("products")
+  @@index([deleted_at])
+}
+
+model ProductCode {
+  id          String @id @db.Uuid @default(uuid())
+  barcode     String
+  product_id  String @db.Uuid
+  status      Int // 0: Available 1: Sold Out 2: Taken
+
+  product Product @relation(fields: [product_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("product_codes")
+  @@index([deleted_at])
+}
+
+model Price {
+  id         String @id @db.Uuid @default(uuid())
+  price      Decimal @db.Decimal
+  is_active  Boolean @default(true)
+  type_id    String @db.Uuid
+
+  type Type @relation(fields: [type_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("prices")
+  @@index([deleted_at])
+}
+
+model Company {
+  id       String         @id @db.Uuid @default(uuid())
+  name     String
+  code     String
+
+  stores Store[]
+  categories Category[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("companies")  
+  @@index([deleted_at])
+}
+
+model Store {
+  id      String         @id @db.Uuid @default(uuid())
+  code    String
+  name    String
+  company_id String @db.Uuid
+  is_active Boolean @default(true)
+  is_flex_price Boolean @default(false)
+  is_float_price Boolean @default(false)
+  poin_config Int @default(0)
+
+  company Company @relation(fields: [company_id], references: [id])
+  products Product[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("stores")
+  @@index([deleted_at])
+  @@index([company_id])
+}
