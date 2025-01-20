@@ -1,12 +1,16 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller } from '@nestjs/common';
+import { MessagePattern } from '@nestjs/microservices';
+import { MessagePatternDiscoveryService } from './discovery/message-pattern-discovery.service';
+import { CustomResponse } from './exception/dto/custom-response.dto';
+import { Exempt } from './decorator/exempt.decorator';
 
-@Controller()
+@Controller('app')
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  constructor(private readonly discovery: MessagePatternDiscoveryService) {}
+  @MessagePattern({ cmd: 'get_routes' })
+  @Exempt()
+  async getAllRoutes(): Promise<any> {
+    const patterns = this.discovery.getMessagePatterns();
+    return CustomResponse.success('Pattern Found!', patterns, 200);
   }
 }
