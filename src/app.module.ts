@@ -11,6 +11,7 @@ import { ValidationModule } from './validation/validation.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MessagePatternDiscoveryService } from './discovery/message-pattern-discovery.service';
 import { OperationModule } from './operation/operation.module';
+import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OperationModule } from './operation/operation.module';
     CompanyModule,
     StoreModule,
     OperationModule,
+    TransactionModule,
   ],
   controllers: [AppController],
   providers: [MessagePatternDiscoveryService],
