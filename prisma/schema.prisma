@@ -73,9 +73,11 @@ model ProductCode {
   id          String @id @db.Uuid @default(uuid())
   barcode     String
   product_id  String @db.Uuid
+  weight      Decimal @db.Decimal
   status      Int // 0: Available 1: Sold Out 2: Taken
 
   product Product @relation(fields: [product_id], references: [id])
+  transaction_products TransactionProduct[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -129,6 +131,9 @@ model Store {
 
   company Company @relation(fields: [company_id], references: [id])
   products Product[]
+  operations Operation[]
+  transactions Transaction[]
+  vouchers Voucher[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -137,4 +142,162 @@ model Store {
   @@map("stores")
   @@index([deleted_at])
   @@index([company_id])
+}
+
+model Operation {
+  id      String         @id @db.Uuid @default(uuid())
+  code    String
+  name    String
+  price   Decimal @db.Decimal
+  uom     String
+  store_id String @db.Uuid
+
+  store Store @relation(fields: [store_id], references: [id])
+  transaction_operations TransactionOperation[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("operations")
+  @@index([deleted_at])
+  @@index([store_id])
+}
+
+model Customer {
+  id         String @id @db.Uuid @default(uuid())
+  name        String
+  email       String
+  is_verified Boolean @default(false)
+  device_token String?
+
+  transactions Transaction[]
+  vouchers VoucherOwned[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("customers")
+  @@index([deleted_at])
+}
+
+model Voucher {
+  id         String @id @db.Uuid @default(uuid())
+  code        String
+  name        String
+  discount_amount Decimal @db.Decimal
+  poin_price  Int
+  description String?
+  is_active   Boolean @default(true)
+  max_discount Decimal @db.Decimal
+  min_purchase Decimal @db.Decimal
+  start_date  DateTime
+  end_date    DateTime
+  store_id  String @db.Uuid
+
+  store Store @relation(fields: [store_id], references: [id])
+  voucher_owns VoucherOwned[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("vouchers")
+  @@index([deleted_at])
+}
+
+model VoucherOwned {
+  id         String @id @db.Uuid @default(uuid())
+  voucher_id String @db.Uuid
+  customer_id String @db.Uuid
+  is_used    Boolean @default(false)
+  purchesed_at DateTime
+
+  voucher Voucher @relation(fields: [voucher_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
+  transaction Transaction[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("voucher_owneds")
+  @@index([deleted_at])
+}
+
+model Transaction {
+  id                String @id @db.Uuid @default(uuid())
+  code              String
+  transaction_type  Int // 0: Item Sold, 1: Item Bought, 2: Item Exchanged, 3: Service Only
+  payment_method    Int // 0: Cash, 1: Bank Transfer, 2: Credit Card, 3: Debit Card ?
+  payment_link      String? //can expired
+  poin_earned       Int @default(0)
+  expired_at        DateTime? //expired payment link
+  status            Int // 0: Draft/Pending, 1: Paid, 2: Done, -1: Cancelled
+  sub_total_price   Decimal @db.Decimal
+  tax_price         Decimal @db.Decimal
+  total_price       Decimal @db.Decimal
+  comment           String? @db.Text
+  store_id          String @db.Uuid
+  customer_id       String @db.Uuid
+  voucher_own_id    String? @db.Uuid
+
+  store Store @relation(fields: [store_id], references: [id])
+  customer Customer @relation(fields: [customer_id], references: [id])
+  voucher_used VoucherOwned? @relation(fields: [voucher_own_id], references: [id])
+  transaction_products TransactionProduct[]
+  transaction_operations TransactionOperation[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+  @@map("transactions")
+  @@index([deleted_at])
+}
+
+model TransactionProduct {
+  id                  String @id @db.Uuid @default(uuid())
+  transaction_id      String @db.Uuid
+  product_code_id     String @db.Uuid
+  transaction_type    Int // 0: Item Sold, 1: Item Bought, 2: Item Exchanged
+  weight              Decimal @db.Decimal
+  price               Decimal @db.Decimal
+  adjustment_price    Decimal @db.Decimal
+  discount            Decimal @db.Decimal
+  total_price         Decimal @db.Decimal
+  status              Int // 0: Available, 1: Sold Out, 2: Taken
+  comment             String? @db.Text
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id])
+  product_code ProductCode @relation(fields: [product_code_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  @@map("transaction_products")
+  @@index([deleted_at])
+  @@index([transaction_id])
+}
+
+model TransactionOperation {
+  id                 String @id @db.Uuid @default(uuid())
+  transaction_id     String @db.Uuid
+  operation_id       String @db.Uuid
+  unit               Decimal @db.Decimal
+  price              Decimal @db.Decimal
+  adjustment_price   Decimal @db.Decimal
+  total_price        Decimal @db.Decimal
+  comment            String? @db.Text
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id])
+  operation Operation @relation(fields: [operation_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+  @@map("transaction_operations")
+  @@index([deleted_at])
+  @@index([transaction_id])
 }

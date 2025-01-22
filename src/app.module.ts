@@ -10,6 +10,7 @@ import { DiscoveryModule } from '@nestjs/core';
 import { ValidationModule } from './validation/validation.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MessagePatternDiscoveryService } from './discovery/message-pattern-discovery.service';
+import { OperationModule } from './operation/operation.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MessagePatternDiscoveryService } from './discovery/message-pattern-disc
     PriceModule,
     CompanyModule,
     StoreModule,
+    OperationModule,
   ],
   controllers: [AppController],
   providers: [MessagePatternDiscoveryService],
