@@ -1,10 +1,11 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import { ZodError } from 'zod';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 @Catch()
 export class RPCExceptionFilter<T> implements ExceptionFilter {
   catch(exception: T, host: ArgumentsHost) {
-    console.log('Exception thrown', exception);
+    console.log('Exception thrown:', exception);
     const ctx = host.switchToRpc();
     const data = ctx.getData();
 
@@ -19,18 +20,34 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
 
       console.log('Validation error response:', errorResponse);
       return errorResponse; // Return formatted validation errors
-    } else {
-      // Format the error response
+    }
+
+    // Check if the exception is a PrismaClientKnownRequestError
+    if (exception instanceof PrismaClientKnownRequestError) {
+      const formattedErrors = this.formatPrismaError(exception);
       const errorResponse = {
-        statusCode: 500,
-        message: exception instanceof Error ? exception.message : exception,
-        error: exception instanceof Error ? exception.message : exception,
-        data: data, // Optional: include the original data for debugging
+        statusCode: 400,
+        message: 'Database error',
+        errors: formattedErrors,
       };
 
-      // Return the error response as the result of the RPC handler
-      return errorResponse;
+      console.log('Database error response:', errorResponse);
+      return errorResponse; // Return formatted database errors
     }
+
+    // Fallback for unknown errors
+    const errorResponse = {
+      statusCode: 500,
+      message:
+        exception instanceof Error
+          ? exception.message
+          : 'Internal server error',
+      error: exception instanceof Error ? exception.message : exception,
+      data: data, // Optional: include the original data for debugging
+    };
+
+    console.log('Fallback error response:', errorResponse);
+    return errorResponse; // Return the fallback error response
   }
 
   // Helper method to format ZodError
@@ -42,7 +59,7 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
         code: issue.code,
       };
 
-      // Narrow down to issue types and include relevant properties
+      // Include additional properties for specific error types
       if ('expected' in issue) formattedIssue.expected = issue.expected;
       if ('received' in issue) formattedIssue.received = issue.received;
       if ('minimum' in issue) formattedIssue.minimum = issue.minimum;
@@ -52,5 +69,38 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
 
       return formattedIssue;
     });
+  }
+
+  // Helper method to format PrismaClientKnownRequestError
+  private formatPrismaError(
+    error: PrismaClientKnownRequestError,
+  ): Record<string, any>[] {
+    // Customize based on Prisma error codes
+    console.log('Prisma error:', error);
+    let message = 'Database error';
+    const formattedIssue: Record<string, any> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    // Include relevant details based on the error code
+    switch (error.code) {
+      case 'P2002': // Unique constraint failed
+        message = `${error.meta?.target[0]} already exists`;
+        formattedIssue.field = error.meta?.target[0] || [];
+        break;
+      case 'P2003': // Foreign key constraint failed
+        message = 'Foreign key constraint failed';
+        break;
+      case 'P2025': // Record not found
+        message = 'Record not found';
+        break;
+      default:
+        message = 'An unknown database error occurred';
+        break;
+    }
+
+    formattedIssue.message = message;
+    return [formattedIssue];
   }
 }
