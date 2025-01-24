@@ -31,7 +31,11 @@ export class ProductService extends BaseService {
   }
 
   async generateProductCode(data: any) {
-    const validatedData = new ProductCodeDto(data);
+    const convert = new ProductCodeDto(data);
+    const validatedData = this.validation.validate(
+      convert,
+      ProductCodeDto.schema(),
+    );
     const code = await this.productCodeRepository.create(validatedData);
     return CustomResponse.success('Product code generated!', code, 201);
   }

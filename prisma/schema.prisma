@@ -52,7 +52,6 @@ model Product{
   id          String @id @db.Uuid @default(uuid())
   code        String
   name        String
-  fixed_price  Decimal @db.Decimal
   status      Int // 0: Inactive, 1: Active, 2: Sold Out
   type_id     String @db.Uuid
   store_id    String @db.Uuid
@@ -74,6 +73,7 @@ model ProductCode {
   barcode     String
   product_id  String @db.Uuid
   weight      Decimal @db.Decimal
+  fixed_price       Decimal @db.Decimal 
   status      Int // 0: Available 1: Sold Out 2: Taken
 
   product Product @relation(fields: [product_id], references: [id])
