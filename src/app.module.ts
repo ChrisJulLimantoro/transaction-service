@@ -13,6 +13,7 @@ import { MessagePatternDiscoveryService } from './discovery/message-pattern-disc
 import { OperationModule } from './operation/operation.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { CustomerModule } from './customer/customer.module';
+import { VoucherModule } from './voucher/voucher.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CustomerModule } from './customer/customer.module';
     OperationModule,
     TransactionModule,
     CustomerModule,
+    VoucherModule,
   ],
   controllers: [AppController],
   providers: [MessagePatternDiscoveryService],
