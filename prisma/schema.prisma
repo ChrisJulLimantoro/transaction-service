@@ -52,10 +52,7 @@ model Product {
   id          String  @id @default(uuid()) @db.Uuid
   code        String
   name        String
-<<<<<<< Updated upstream
-=======
   fixed_price Decimal @db.Decimal
->>>>>>> Stashed changes
   status      Int // 0: Inactive, 1: Active, 2: Sold Out
   type_id     String  @db.Uuid
   store_id    String  @db.Uuid
@@ -73,20 +70,12 @@ model Product {
 }
 
 model ProductCode {
-<<<<<<< Updated upstream
-  id          String @id @db.Uuid @default(uuid())
+  id          String  @id @default(uuid()) @db.Uuid
   barcode     String
-  product_id  String @db.Uuid
+  product_id  String  @db.Uuid
   weight      Decimal @db.Decimal
-  fixed_price       Decimal @db.Decimal 
+  fixed_price Decimal @db.Decimal
   status      Int // 0: Available 1: Sold Out 2: Taken
-=======
-  id         String  @id @default(uuid()) @db.Uuid
-  barcode    String
-  product_id String  @db.Uuid
-  weight     Decimal @db.Decimal
-  status     Int // 0: Available 1: Sold Out 2: Taken
->>>>>>> Stashed changes
 
   product              Product              @relation(fields: [product_id], references: [id])
   transaction_products TransactionProduct[]
