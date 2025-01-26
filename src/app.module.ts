@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MessagePatternDiscoveryService } from './discovery/message-pattern-discovery.service';
 import { OperationModule } from './operation/operation.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TransactionModule } from './transaction/transaction.module';
     StoreModule,
     OperationModule,
     TransactionModule,
+    CustomerModule,
   ],
   controllers: [AppController],
   providers: [MessagePatternDiscoveryService],
