@@ -22,4 +22,44 @@ export class CustomerService {
       data: { is_verified: true },
     });
   }
+
+  async updateProfile(data: any): Promise<any> {
+    console.log(data);
+    const updateUser = await this.prismaService.customer.update({
+      where: { id: data.id },
+      data: {
+        name: data.name,
+        phone: data.phone,
+      },
+    });
+    return updateUser;
+  }
+
+  async deleteUser(userId: string): Promise<any> {
+    const deletedUser = await this.prismaService.customer.update({
+      where: { id: userId },
+      data: {
+        deleted_at: new Date(),
+      },
+    });
+
+    return deletedUser;
+  }
+  async addDeviceToken(userId: string, deviceToken: string): Promise<any> {
+    const user = await this.prismaService.customer.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new Error('User not found!');
+
+    const updatedUser = await this.prismaService.customer.update({
+      where: { id: userId },
+      data: {
+        device_token: {
+          push: deviceToken,
+        },
+      },
+    });
+
+    return updatedUser;
+  }
 }

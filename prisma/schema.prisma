@@ -169,6 +169,7 @@ model Customer {
   id           String   @id @default(uuid()) @db.Uuid
   name         String
   email        String   @unique
+  phone        String
   is_verified  Boolean  @default(false)
   device_token String[] @default([])
 

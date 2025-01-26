@@ -19,4 +19,30 @@ export class CustomerController {
     const response = await this.customerService.verifyUser(data);
     return response;
   }
+
+  @EventPattern({ cmd: 'update_profile' })
+  @Exempt()
+  async updateProfile(@Payload() data: any) {
+    const response = await this.customerService.updateProfile(data);
+    return response;
+  }
+
+  @EventPattern({ cmd: 'soft_delete' })
+  @Exempt()
+  async deleteUser(@Payload() data: any) {
+    const response = await this.customerService.deleteUser(data.id);
+    return response;
+  }
+
+  @EventPattern({ cmd: 'add_device_token' })
+  @Exempt()
+  async addDeviceToken(
+    @Payload() data: { userId: string; deviceToken: string },
+  ) {
+    const response = await this.customerService.addDeviceToken(
+      data.userId,
+      data.deviceToken,
+    );
+    return response;
+  }
 }
