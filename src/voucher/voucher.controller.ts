@@ -1,7 +1,8 @@
 import { Controller, Inject } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
-import { ClientProxy, MessagePattern, Payload } from '@nestjs/microservices';
+import { ClientProxy, EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
+import { Exempt } from 'src/decorator/exempt.decorator';
 
 @Controller('voucher')
 export class VoucherController {
@@ -87,5 +88,15 @@ export class VoucherController {
         statusCode: 500,
       };
     }
+  }
+
+  @EventPattern({ cmd: 'purchase_voucher' })
+  @Exempt()
+  async deleteUser(@Payload() data: any) {
+    console.log(data);
+    const response= await this.voucherService.purchaseVoucher(data);
+    return response;
+    // const response = await this.customerService.deleteUser(data.id);
+    // return response;
   }
 }

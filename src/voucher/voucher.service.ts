@@ -78,6 +78,19 @@ export class VoucherService {
     return updatedVoucher;
   }
 
+  async purchaseVoucher(data: any): Promise<any> {
+    const purchased = await this.prisma.voucherOwned.create({
+      data: {
+        id: data.id,
+        customer_id: data.user_id,
+        voucher_id: data.voucher_id,
+        purchesed_at: new Date(data.purchased_at),
+        is_used: data.is_used,
+      },
+    });
+    return purchased;
+  }
+
   async softDelete(voucher_id: string): Promise<any> {
     const voucher = await this.prisma.voucher.findUnique({
       where: { id: voucher_id },
