@@ -27,6 +27,7 @@
     "@prisma/client": "^6.2.1",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.5",
+    "axios": "^1.7.9",
     "microservices": "^0.1.0",
     "prisma": "^6.2.1",
     "reflect-metadata": "^0.2.0",
