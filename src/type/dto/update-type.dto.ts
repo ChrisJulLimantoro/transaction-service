@@ -12,7 +12,7 @@ export class UpdateTypeRequest {
   static schema() {
     return z.object({
       name: z.string().min(3).max(255).nullable().optional(),
-      code: z.string().max(5).nullable().optional(),
+      code: z.string().max(15).nullable().optional(),
     });
   }
 }

@@ -17,7 +17,7 @@ export class CreateTypeRequest {
     return z.object({
       id: z.string().uuid(),
       name: z.string().min(3).max(255),
-      code: z.string().max(5),
+      code: z.string().max(15),
       category_id: z.string().uuid(),
     });
   }

@@ -92,6 +92,7 @@ model Price {
   price      Decimal @db.Decimal
   is_active  Boolean @default(true)
   type_id    String @db.Uuid
+  date       DateTime
 
   type Type @relation(fields: [type_id], references: [id])
 
