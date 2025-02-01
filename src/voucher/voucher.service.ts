@@ -13,6 +13,19 @@ export class VoucherService {
     private readonly validationService: ValidationService,
   ) {}
 
+  async getByStore(store_id: string): Promise<any> {
+    const vouchers = await this.prisma.voucher.findMany({
+      where: {
+        store_id: store_id,
+        deleted_at: null,
+      },
+      include: {
+        store: true,
+      },
+    });
+
+    return vouchers;
+  }
   async create(request: VoucherRequest): Promise<any> {
     // Validate the request data
     console.log(request);

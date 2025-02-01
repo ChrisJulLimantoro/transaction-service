@@ -1,6 +1,11 @@
 import { Controller, Inject } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
-import { ClientProxy, EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
+import {
+  ClientProxy,
+  EventPattern,
+  MessagePattern,
+  Payload,
+} from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
 import { Exempt } from 'src/decorator/exempt.decorator';
 
@@ -10,6 +15,27 @@ export class VoucherController {
     private readonly voucherService: VoucherService,
     @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
   ) {}
+
+  @MessagePattern({ cmd: 'get:voucher:store' })
+  @Describe('Get Vouchers By Store')
+  async getByStore(@Payload() data: any): Promise<any> {
+    try {
+      const result = await this.voucherService.getByStore(data.params.store_id);
+      return {
+        success: true,
+        message: 'Success Retrieve Vouchers!',
+        data: result,
+        statusCode: 200,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        errors: [error.message],
+        statusCode: 500,
+      };
+    }
+  }
 
   @MessagePattern({ cmd: 'post:voucher' })
   @Describe('Create Voucher')
@@ -94,7 +120,7 @@ export class VoucherController {
   @Exempt()
   async deleteUser(@Payload() data: any) {
     console.log(data);
-    const response= await this.voucherService.purchaseVoucher(data);
+    const response = await this.voucherService.purchaseVoucher(data);
     return response;
     // const response = await this.customerService.deleteUser(data.id);
     // return response;
