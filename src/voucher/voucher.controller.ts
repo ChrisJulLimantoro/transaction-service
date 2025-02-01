@@ -16,7 +16,7 @@ export class VoucherController {
     @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
   ) {}
 
-  @MessagePattern({ cmd: 'get:voucher:store' })
+  @MessagePattern({ cmd: 'get:voucher/*/store' })
   @Describe('Get Vouchers By Store')
   async getByStore(@Payload() data: any): Promise<any> {
     try {
@@ -24,6 +24,26 @@ export class VoucherController {
       return {
         success: true,
         message: 'Success Retrieve Vouchers!',
+        data: result,
+        statusCode: 200,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        errors: [error.message],
+        statusCode: 500,
+      };
+    }
+  }
+  @MessagePattern({ cmd: 'get:voucher/*/id' })
+  @Describe('Get Voucher By ID')
+  async getById(@Payload() data: any): Promise<any> {
+    try {
+      const result = await this.voucherService.getById(data.params.id);
+      return {
+        success: true,
+        message: 'Success Retrieve Voucher!',
         data: result,
         statusCode: 200,
       };

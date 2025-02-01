@@ -54,6 +54,32 @@ export class VoucherService {
     return createdVoucher;
   }
 
+  async getById(voucher_id: string): Promise<any> {
+    // Cari voucher berdasarkan ID
+    const voucher = await this.prisma.voucher.findUnique({
+      where: { id: voucher_id },
+      include: { store: true },
+    });
+
+    if (!voucher) {
+      throw new HttpException(
+        `Voucher with ID ${voucher_id} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Hitung total voucher yang sudah dibeli dari VoucherOwned
+    const totalSold = await this.prisma.voucherOwned.count({
+      where: { voucher_id },
+    });
+
+    // Return data dengan tambahan totalSold
+    return {
+      ...voucher,
+      totalSold, // Tambahkan jumlah voucher yang sudah dibeli
+    };
+  }
+
   async update(voucher_id: string, request: VoucherRequest): Promise<any> {
     VoucherValidation.CREATE.parse(request);
     const voucher = await this.prisma.voucher.findUnique({
