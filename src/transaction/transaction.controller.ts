@@ -1,17 +1,22 @@
-import { Controller } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { Controller, Inject } from '@nestjs/common';
 import {
   ClientProxy,
   ClientProxyFactory,
+  MessagePattern,
+  Payload,
   Transport,
 } from '@nestjs/microservices';
-import axios from 'axios';
+import { TransactionService } from './transaction.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('transaction')
 export class TransactionController {
   private marketplaceServiceClient: ClientProxy;
 
-  constructor() {
+  constructor(
+    private readonly transactionService: TransactionService,
+    private readonly prisma: PrismaService,
+  ) {
     this.marketplaceServiceClient = ClientProxyFactory.create({
       transport: Transport.RMQ,
       options: {
@@ -25,34 +30,99 @@ export class TransactionController {
   }
 
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
-  async createTransaction(
-    @Payload()
-    data: {
-      orderId: string;
-      grossAmount: number;
-      items: any[];
-      customerDetails: any;
-    },
-  ) {
+  async createTransaction(@Payload() data: any) {
     try {
       console.log('Processing transaction:', data);
 
-      // Panggil Midtrans API untuk mendapatkan payment link
-      const midtransResponse = await this.callMidtransApi(data);
+      // 🔍 Validasi input
+      if (
+        !data.orderId ||
+        !data.grossAmount ||
+        !data.items ||
+        !data.customerDetails
+      ) {
+        throw new Error('Missing required transaction details');
+      }
 
-      // Kirim hasilnya langsung ke Marketplace Service sebagai subscriber
+      // 🕒 Hitung batas expired 24 jam setelah transaksi dibuat
+      const expiredAt = new Date();
+      expiredAt.setHours(expiredAt.getHours() + 24);
+
+      // 🔗 Panggil Midtrans untuk mendapatkan payment link
+      const paymentLink =
+        await this.transactionService.processTransaction(data);
+
+      // 🛒 Simpan transaksi ke database dengan Prisma
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          id: String(data.orderId),
+          code: 'TES-' + Math.floor(1000 + Math.random() * 9000),
+          transaction_type: 0, // Default ke penjualan
+          payment_method: 4, // E-Wallet
+          status: 0, // Waiting Payment
+          sub_total_price: Number(data.grossAmount),
+          total_price: Number(data.grossAmount) - (Number(data.discount) || 0),
+          tax_price: 0, // Pajak bisa ditambahkan jika perlu
+          payment_link: paymentLink,
+          expired_at: expiredAt,
+
+          // 🏬 Hubungkan store dengan `connect`
+          store: { connect: { id: String(data.storeId) } },
+
+          // 👤 Hubungkan customer dengan `connect`
+          customer: { connect: { id: String(data.customerId) } },
+
+          // 🎟 Hubungkan voucher jika ada
+          voucher_used: data.voucherOwnedId
+            ? { connect: { id: String(data.voucherOwnedId) } }
+            : undefined,
+        },
+      });
+
+      // 📦 Simpan produk dalam transaksi
+      for (const item of data.items) {
+        await this.prisma.transactionProduct.create({
+          data: {
+            transaction: { connect: { id: String(data.orderId) } },
+            product_code: { connect: { id: String(item.id) } },
+            transaction_type: 0,
+            price: Number(item.price),
+            adjustment_price: Number(item.price),
+            weight: Number(item.weight || 0),
+            discount: Number(item.discount || 0),
+            total_price: Number(item.price) * Number(item.quantity),
+            status: 0,
+          },
+        });
+      }
+
+      // 🔍 **Ambil Data Lengkap Transaksi Setelah Disimpan**
+      const fullTransaction = await this.prisma.transaction.findUnique({
+        where: { id: String(data.orderId) },
+        include: {
+          store: true,
+          customer: true,
+          voucher_used: true,
+          transaction_products: {
+            include: {
+              product_code: true,
+            },
+          },
+        },
+      });
+
+      // 🔔 Emit event ke marketplace dengan data lengkap
       await this.marketplaceServiceClient.emit('transaction_created', {
-        orderId: data.orderId,
-        paymentLink: midtransResponse.redirect_url,
+        orderId: fullTransaction.id,
+        paymentLink: fullTransaction.payment_link,
         status: 'waiting_payment',
+        transaction: fullTransaction, // ✅ Kirim seluruh transaksi
       });
 
       return {
         success: true,
         message: 'Transaction processed successfully',
-        data: {
-          paymentLink: midtransResponse.redirect_url,
-        },
+        data: { paymentLink, expiredAt },
       };
     } catch (error) {
       console.error('Error processing transaction:', error.message);
@@ -60,55 +130,6 @@ export class TransactionController {
         success: false,
         message: error.message || 'Failed to process transaction',
       };
-    }
-  }
-
-  private async callMidtransApi(data: {
-    orderId: string;
-    grossAmount: number;
-    items: any[];
-    customerDetails: any;
-  }): Promise<any> {
-    const midtransUrl = 'https://app.sandbox.midtrans.com/snap/v1/transactions';
-    const midtransServerKey =
-      'U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=';
-
-    try {
-      const response = await axios.post(
-        midtransUrl,
-        {
-          transaction_details: {
-            order_id: data.orderId,
-            gross_amount: data.grossAmount,
-          },
-          item_details: data.items,
-          customer_details: data.customerDetails,
-          enabled_payments: [
-            'credit_card',
-            'bca_va',
-            'gopay',
-            'shopeepay',
-            'other_qris',
-          ],
-        },
-        {
-          headers: {
-            Authorization: `Basic ${midtransServerKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-
-      if (response.status === 201) {
-        return response.data;
-      } else {
-        throw new Error(`Midtrans API Error: ${response.data.message}`);
-      }
-    } catch (error) {
-      console.error('Midtrans API Error:', error.message);
-      throw new Error(
-        error.response?.data?.message || 'Midtrans API request failed',
-      );
     }
   }
 }

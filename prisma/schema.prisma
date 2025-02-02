@@ -89,11 +89,11 @@ model ProductCode {
 }
 
 model Price {
-  id         String @id @db.Uuid @default(uuid())
-  price      Decimal @db.Decimal
-  is_active  Boolean @default(true)
-  type_id    String @db.Uuid
-  date       DateTime
+  id        String   @id @default(uuid()) @db.Uuid
+  price     Decimal  @db.Decimal
+  is_active Boolean  @default(true)
+  type_id   String   @db.Uuid
+  date      DateTime
 
   type Type @relation(fields: [type_id], references: [id])
 
@@ -233,10 +233,10 @@ model Transaction {
   id               String    @id @default(uuid()) @db.Uuid
   code             String
   transaction_type Int // 0: Item Sold, 1: Item Bought, 2: Item Exchanged, 3: Service Only
-  payment_method   Int // 0: Cash, 1: Bank Transfer, 2: Credit Card, 3: Debit Card ?
-  payment_link     String? //can expired
+  payment_method   Int // 0: Cash, 1: Bank Transfer, 2: Credit Card, 3: Debit Card
+  payment_link     String? // Payment link bisa expired
   poin_earned      Int       @default(0)
-  expired_at       DateTime? //expired payment link
+  expired_at       DateTime? // Expired payment link
   status           Int // 0: Draft/Pending, 1: Paid, 2: Done, -1: Cancelled
   sub_total_price  Decimal   @db.Decimal
   tax_price        Decimal   @db.Decimal
