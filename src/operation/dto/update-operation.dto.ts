@@ -15,10 +15,10 @@ export class UpdateOperationRequest {
 
   static schema() {
     return z.object({
-      code: z.string().max(5).optional(),
+      code: z.string().max(15).optional(),
       name: z.string().min(3).max(255).optional(),
       price: z.number().nonnegative().optional(),
-      uom: z.string().max(5).optional(),
+      uom: z.string().max(15).optional(),
     });
   }
 }

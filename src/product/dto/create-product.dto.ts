@@ -21,7 +21,7 @@ export class CreateProductRequest {
     return z.object({
       id: z.string().uuid(),
       name: z.string().min(3).max(255),
-      code: z.string().max(8),
+      code: z.string().max(25),
       type_id: z.string().uuid(),
       store_id: z.string().uuid(),
       status: z.number().optional(),

@@ -22,9 +22,9 @@ export class CreateOperationRequest {
     return z.object({
       id: z.string().uuid(),
       name: z.string().min(3).max(255),
-      code: z.string().max(5),
+      code: z.string().max(15),
       price: z.number().nonnegative(),
-      uom: z.string().max(5),
+      uom: z.string().max(15),
       store_id: z.string().uuid(),
     });
   }
