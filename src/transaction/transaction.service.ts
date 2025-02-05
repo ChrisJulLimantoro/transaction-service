@@ -129,26 +129,39 @@ export class TransactionService extends BaseService {
     customerDetails: any;
   }): Promise<string> {
     try {
-      // ✅ Buat order ID yang unik
-      const orderId = uuidv4();
+      const orderId = data.orderId;
 
-      // ✅ Validasi gross amount dengan total items
-      const calculatedTotal = data.items.reduce(
+      // ✅ Calculate grossAmount from items (before discount)
+      const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
-      if (calculatedTotal !== data.grossAmount) {
+
+      // ✅ Validate that grossAmount matches total item price (before discount)
+      if (totalItemPrice !== data.grossAmount) {
         throw new Error(
-          `Gross amount mismatch! Expected: ${calculatedTotal}, Got: ${data.grossAmount}`,
+          `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
 
-      // ✅ Format waktu `start_time` sesuai ketentuan Midtrans
+      // ✅ Ensure timezone is in Jakarta (GMT+7)
       const now = new Date();
-      const formattedStartTime =
-        now.toISOString().replace('T', ' ').split('.')[0] + ' +0700';
+      now.setHours(now.getHours() + 7); // Sesuaikan ke WIB (+7)
 
-      // ✅ Format customer details dengan nilai default jika tidak tersedia
+      const expiredTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 jam dari sekarang
+
+      // ✅ Format `start_time` agar sesuai dengan Midtrans (YYYY-MM-DD HH:MM:SS +0700)
+      const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now
+        .getHours()
+        .toString()
+        .padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now
+        .getSeconds()
+        .toString()
+        .padStart(2, '0')} +0700`;
+
+      // ✅ Format customer details
       const customerDetails = {
         first_name: data.customerDetails.first_name || '',
         last_name: data.customerDetails.last_name || '',
@@ -170,21 +183,21 @@ export class TransactionService extends BaseService {
         },
       };
 
-      // ✅ Kirim request ke Midtrans
+      // ✅ Send request to Midtrans
       const response = await axios.post(
         this.midtransUrl,
         {
           transaction_details: {
             order_id: orderId,
-            gross_amount: data.grossAmount,
+            gross_amount: totalItemPrice, // ✅ Send total before discount
           },
-          item_details: data.items,
+          item_details: data.items, // ✅ Midtrans handles discount separately
           customer_details: customerDetails,
           enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
           expiry: {
             start_time: formattedStartTime,
-            unit: 'hour',
-            duration: 24,
+            unit: 'minute',
+            duration: 60,
           },
         },
         {

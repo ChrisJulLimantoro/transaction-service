@@ -52,13 +52,26 @@ export class TransactionController {
         throw new Error('Missing required transaction details');
       }
 
-      // 🕒 Hitung batas expired 24 jam setelah transaksi dibuat
+      // 🕒 Hitung batas expired 1 jam setelah transaksi dibuat
       const expiredAt = new Date();
-      expiredAt.setHours(expiredAt.getHours() + 24);
+      expiredAt.setHours(expiredAt.getHours() + 1);
 
       // 🔗 Panggil Midtrans untuk mendapatkan payment link
       const paymentLink =
         await this.transactionService.processTransactionMarketplace(data);
+
+      // ✅ Hitung `sub_total_price` dari item yang bukan "DISCOUNT"
+      const filteredItems = data.items.filter((item) => item.id !== 'DISCOUNT'); // Exclude discount
+      const subTotalPrice = filteredItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      // ✅ Calculate total price from `grossAmount`
+      const totalPrice = data.grossAmount;
+
+      // ✅ Calculate discount dynamically from `sub_total_price - total_price`
+      const discountAmount = subTotalPrice - totalPrice;
 
       // 🛒 Simpan transaksi ke database dengan Prisma
       const transaction = await this.prisma.transaction.create({
@@ -69,8 +82,8 @@ export class TransactionController {
           transaction_type: 0, // Default ke penjualan
           payment_method: 4, // E-Wallet
           status: 0, // Waiting Payment
-          sub_total_price: Number(data.grossAmount),
-          total_price: Number(data.grossAmount) - (Number(data.discount) || 0),
+          sub_total_price: subTotalPrice, // ✅ Harga sebelum diskon
+          total_price: totalPrice, // ✅ Harga setelah diskon
           tax_price: 0, // Pajak bisa ditambahkan jika perlu
           payment_link: paymentLink,
           expired_at: expiredAt,
@@ -88,8 +101,8 @@ export class TransactionController {
         },
       });
 
-      // 📦 Simpan produk dalam transaksi
-      for (const item of data.items) {
+      // 📦 Simpan produk dalam transaksi (Exclude discount item)
+      for (const item of filteredItems) {
         await this.prisma.transactionProduct.create({
           data: {
             transaction: { connect: { id: String(data.orderId) } },
@@ -131,7 +144,7 @@ export class TransactionController {
       return {
         success: true,
         message: 'Transaction processed successfully',
-        data: { paymentLink, expiredAt },
+        data: { paymentLink, expiredAt, discountAmount }, // ✅ Return discountAmount
       };
     } catch (error) {
       console.error('Error processing transaction:', error.message);
