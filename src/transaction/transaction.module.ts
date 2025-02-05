@@ -5,6 +5,7 @@ import { TransactionRepository } from 'src/repositories/transaction.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
 import { TransactionProductRepository } from 'src/repositories/transaction-product.repository';
+import { SharedModule } from 'src/shared.module';
 
 @Module({
   providers: [
@@ -15,5 +16,6 @@ import { TransactionProductRepository } from 'src/repositories/transaction-produ
     TransactionProductRepository,
   ],
   controllers: [TransactionController],
+  imports: [SharedModule],
 })
 export class TransactionModule {}

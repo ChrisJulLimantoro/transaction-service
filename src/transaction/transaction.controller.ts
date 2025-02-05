@@ -11,26 +11,34 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('transaction')
 export class TransactionController {
-  private marketplaceServiceClient: ClientProxy;
-
   constructor(
     private readonly transactionService: TransactionService,
     private readonly prisma: PrismaService,
-  ) {
-    this.marketplaceServiceClient = ClientProxyFactory.create({
-      transport: Transport.RMQ,
-      options: {
-        urls: ['amqp://localhost:5672'],
-        queue: 'marketplace_service_queue',
-        queueOptions: {
-          durable: true,
-        },
-      },
-    });
+    @Inject('MARKETPLACE')
+    private readonly marketplaceClient: ClientProxy,
+  ) {}
+
+  @MessagePattern({ cmd: 'get:transaction' })
+  async getTransaction(@Payload() data: any) {
+    const filter = data.body;
+    return await this.transactionService.findAll(filter);
   }
 
-  @MessagePattern({ module: 'transaction', action: 'createTransaction' })
+  @MessagePattern({ cmd: 'get:transaction/*' })
+  async getTransactionById(@Payload() data: any) {
+    const id = data.params.id;
+    return await this.transactionService.findOne(id);
+  }
+
+  @MessagePattern({ cmd: 'post:transaction' })
   async createTransaction(@Payload() data: any) {
+    const response = await this.transactionService.create(data.body);
+    return response;
+  }
+
+  // Marketplace Endpoint
+  @MessagePattern({ module: 'transaction', action: 'createTransaction' })
+  async createTransactionMarketplace(@Payload() data: any) {
     try {
       console.log('Processing transaction:', data);
 
@@ -50,12 +58,13 @@ export class TransactionController {
 
       // 🔗 Panggil Midtrans untuk mendapatkan payment link
       const paymentLink =
-        await this.transactionService.processTransaction(data);
+        await this.transactionService.processTransactionMarketplace(data);
 
       // 🛒 Simpan transaksi ke database dengan Prisma
       const transaction = await this.prisma.transaction.create({
         data: {
           id: String(data.orderId),
+          date: new Date(),
           code: 'TES-' + Math.floor(1000 + Math.random() * 9000),
           transaction_type: 0, // Default ke penjualan
           payment_method: 4, // E-Wallet
@@ -112,7 +121,7 @@ export class TransactionController {
       });
 
       // 🔔 Emit event ke marketplace dengan data lengkap
-      await this.marketplaceServiceClient.emit('transaction_created', {
+      await this.marketplaceClient.emit('transaction_created', {
         orderId: fullTransaction.id,
         paymentLink: fullTransaction.payment_link,
         status: 'waiting_payment',

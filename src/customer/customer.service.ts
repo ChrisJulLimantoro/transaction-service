@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { CustomResponse } from 'src/exception/dto/custom-response.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -61,5 +62,15 @@ export class CustomerService {
     });
 
     return updatedUser;
+  }
+  async findAll(data: any): Promise<any> {
+    const users = await this.prismaService.customer.findMany({
+      where: {
+        deleted_at: null,
+      },
+    });
+    if (!users) throw new Error('No users found!');
+
+    return CustomResponse.success('Users retrieved!', users, 200);
   }
 }

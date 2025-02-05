@@ -13,7 +13,7 @@ export class CreateOperationRequest {
     this.id = id;
     this.name = name;
     this.code = code;
-    this.price = price;
+    this.price = parseFloat(price);
     this.uom = uom;
     this.store_id = store_id;
   }

@@ -14,6 +14,7 @@ import { OperationModule } from './operation/operation.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { CustomerModule } from './customer/customer.module';
 import { VoucherModule } from './voucher/voucher.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { VoucherModule } from './voucher/voucher.module';
     TransactionModule,
     CustomerModule,
     VoucherModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [MessagePatternDiscoveryService],

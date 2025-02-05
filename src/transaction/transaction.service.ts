@@ -1,15 +1,128 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { BaseService } from 'src/base.service';
+import { TransactionRepository } from 'src/repositories/transaction.repository';
+import { ValidationService } from 'src/validation/validation.service';
 import { v4 as uuidv4 } from 'uuid';
+import { CreateTransactionRequest } from './dto/create-transaction.dto';
+import { UpdateTransactionRequest } from './dto/update-transaction.dto';
+import { CustomResponse } from 'src/exception/dto/custom-response.dto';
+import { CreateTransactionProductRequest } from './dto/create-transaction-product.dto';
+import { CreateTransactionOperationRequest } from './dto/create-transaction-operation.dto';
+import { TransactionProductRepository } from 'src/repositories/transaction-product.repository';
+import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
-export class TransactionService {
+export class TransactionService extends BaseService {
+  protected repository = this.transactionRepository;
+  protected createSchema = CreateTransactionRequest.schema();
+  protected updateSchema = UpdateTransactionRequest.schema();
+
+  constructor(
+    private readonly transactionRepository: TransactionRepository,
+    private readonly transactionProductRepository: TransactionProductRepository,
+    private readonly transactionOperationRepository: TransactionOperationRepository,
+    protected readonly validation: ValidationService,
+    private readonly prisma: PrismaService,
+  ) {
+    super(validation);
+  }
+
+  protected transformCreateData(data: any) {
+    return new CreateTransactionRequest(data);
+  }
+
+  protected transformUpdateData(data: any) {
+    return new UpdateTransactionRequest(data);
+  }
+
+  private readonly transanctionType = {
+    1: { name: 'Sales', label: 'SAL' },
+    2: { name: 'Purchase', label: 'PUR' },
+    3: { name: 'Trade', label: 'TRA' },
+  };
+
+  async create(data: any): Promise<CustomResponse> {
+    if (data.transaction_details.length === 0) {
+      return CustomResponse.error(
+        'Transaction Details must not be empty',
+        null,
+        400,
+      );
+    }
+
+    // Generate Code
+    const date = new Date(data.date);
+    const count = await this.repository.count({
+      transaction_type: data.transaction_type,
+      date: date,
+    });
+    const store = await this.prisma.store.findUnique({
+      where: { id: data.store_id },
+    });
+
+    const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth()}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
+    data.code = code;
+    data.paid_amount = data.total_price; // for now assume always fully paid
+
+    const transData = new CreateTransactionRequest(data);
+    const validatedData = this.validation.validate(
+      transData,
+      this.createSchema,
+    );
+    const transaction = await this.repository.create(validatedData);
+
+    if (!transaction) {
+      return CustomResponse.error('Failed to create transaction', null, 500);
+    }
+
+    // Create Transaction Details
+    const transactionDetails = [];
+    for (const detail of data.transaction_details) {
+      transactionDetails.push({
+        ...detail,
+        transaction_id: transaction.id,
+        transaction_type: transaction.transaction_type,
+        weight: detail.quantity,
+        unit: detail.quantity,
+        status: 2,
+      });
+    }
+
+    for (const detail of transactionDetails) {
+      await this.createTransactionDetails(detail);
+    }
+
+    return CustomResponse.success('Transaction created successfully', null);
+  }
+
+  async createTransactionDetails(data: any) {
+    var validatedData = null;
+    if (data.detail_type == 'product') {
+      const transactionDetail = new CreateTransactionProductRequest(data);
+      validatedData = this.validation.validate(
+        transactionDetail,
+        CreateTransactionProductRequest.schema(),
+      );
+      await this.transactionProductRepository.create(validatedData);
+    } else {
+      const transactionDetail = new CreateTransactionOperationRequest(data);
+      validatedData = this.validation.validate(
+        transactionDetail,
+        CreateTransactionOperationRequest.schema(),
+      );
+      await this.transactionOperationRepository.create(validatedData);
+    }
+  }
+
+  // MarketPlace Transaction
   private readonly midtransUrl =
     'https://app.sandbox.midtrans.com/snap/v1/transactions';
   private readonly midtransServerKey =
     'U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=';
 
-  async processTransaction(data: {
+  async processTransactionMarketplace(data: {
     orderId: string;
     grossAmount: number;
     items: any[];

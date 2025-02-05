@@ -9,7 +9,7 @@ export class UpdateOperationRequest {
   constructor({ code, name, price, uom }) {
     this.code = code;
     this.name = name;
-    this.price = price;
+    this.price = parseFloat(price);
     this.uom = uom;
   }
 
