@@ -2,8 +2,10 @@ import { Controller, Inject } from '@nestjs/common';
 import {
   ClientProxy,
   ClientProxyFactory,
+  Ctx,
   MessagePattern,
   Payload,
+  RmqContext,
   Transport,
 } from '@nestjs/microservices';
 import { TransactionService } from './transaction.service';
@@ -38,7 +40,10 @@ export class TransactionController {
 
   // Marketplace Endpoint
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
-  async createTransactionMarketplace(@Payload() data: any) {
+  async createTransactionMarketplace(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
     try {
       console.log('Processing transaction:', data);
 
@@ -47,10 +52,13 @@ export class TransactionController {
         !data.orderId ||
         !data.grossAmount ||
         !data.items ||
-        !data.customerDetails
+        !data.customerDetails ||
+        !data.taxAmount // Make sure taxAmount is provided
       ) {
         throw new Error('Missing required transaction details');
       }
+
+      console.log(data.items);
 
       // 🕒 Hitung batas expired 1 jam setelah transaksi dibuat
       const expiredAt = new Date();
@@ -61,19 +69,16 @@ export class TransactionController {
         await this.transactionService.processTransactionMarketplace(data);
 
       // ✅ Hitung `sub_total_price` dari item yang bukan "DISCOUNT"
-      const filteredItems = data.items.filter((item) => item.id !== 'DISCOUNT'); // Exclude discount
+      const filteredItems = data.items.filter(
+        (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+      ); // Exclude discount
       const subTotalPrice = filteredItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
-
-      // ✅ Calculate total price from `grossAmount`
+      console.log('ya');
       const totalPrice = data.grossAmount;
-
-      // ✅ Calculate discount dynamically from `sub_total_price - total_price`
       const discountAmount = subTotalPrice - totalPrice;
-
-      // 🛒 Simpan transaksi ke database dengan Prisma
       const transaction = await this.prisma.transaction.create({
         data: {
           id: String(data.orderId),
@@ -84,10 +89,11 @@ export class TransactionController {
           status: 0, // Waiting Payment
           sub_total_price: subTotalPrice, // ✅ Harga sebelum diskon
           total_price: totalPrice, // ✅ Harga setelah diskon
-          tax_price: 0, // Pajak bisa ditambahkan jika perlu
+          tax_price: data.taxAmount, // Directly using the taxAmount from the frontend
           payment_link: paymentLink,
+          poin_earned: data.poin_earned,
           expired_at: expiredAt,
-
+          //
           // 🏬 Hubungkan store dengan `connect`
           store: { connect: { id: String(data.storeId) } },
 
@@ -133,18 +139,25 @@ export class TransactionController {
         },
       });
 
-      // 🔔 Emit event ke marketplace dengan data lengkap
-      await this.marketplaceClient.emit('transaction_created', {
+      console.log(fullTransaction);
+
+      const channel = context.getChannelRef();
+      channel.ack(context.getMessage());
+      this.marketplaceClient.emit('transaction_created', {
         orderId: fullTransaction.id,
         paymentLink: fullTransaction.payment_link,
         status: 'waiting_payment',
         transaction: fullTransaction, // ✅ Kirim seluruh transaksi
       });
-
       return {
         success: true,
         message: 'Transaction processed successfully',
-        data: { paymentLink, expiredAt, discountAmount }, // ✅ Return discountAmount
+        data: {
+          paymentLink,
+          expiredAt,
+          discountAmount,
+          taxAmount: data.taxAmount,
+        }, // Return the taxAmount
       };
     } catch (error) {
       console.error('Error processing transaction:', error.message);

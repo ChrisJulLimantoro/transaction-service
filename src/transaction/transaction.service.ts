@@ -127,30 +127,31 @@ export class TransactionService extends BaseService {
     grossAmount: number;
     items: any[];
     customerDetails: any;
+    taxAmount: number; // Receive taxAmount separately from frontend
   }): Promise<string> {
     try {
       const orderId = data.orderId;
 
-      // ✅ Calculate grossAmount from items (before discount)
+      // Calculate total item price before discount (gross amount)
       const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
 
-      // ✅ Validate that grossAmount matches total item price (before discount)
+      // Validate that grossAmount matches total item price (before discount)
       if (totalItemPrice !== data.grossAmount) {
         throw new Error(
           `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
 
-      // ✅ Ensure timezone is in Jakarta (GMT+7)
+      // Ensure timezone is in Jakarta (GMT+7)
       const now = new Date();
-      now.setHours(now.getHours() + 7); // Sesuaikan ke WIB (+7)
+      now.setHours(now.getHours() + 7); // Set timezone to WIB (+7)
 
-      const expiredTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 jam dari sekarang
+      const expiredTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      // ✅ Format `start_time` agar sesuai dengan Midtrans (YYYY-MM-DD HH:MM:SS +0700)
+      // Format `start_time` to be compatible with Midtrans (YYYY-MM-DD HH:MM:SS +0700)
       const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1)
         .toString()
         .padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now
@@ -161,7 +162,7 @@ export class TransactionService extends BaseService {
         .toString()
         .padStart(2, '0')} +0700`;
 
-      // ✅ Format customer details
+      // Format customer details
       const customerDetails = {
         first_name: data.customerDetails.first_name || '',
         last_name: data.customerDetails.last_name || '',
@@ -183,15 +184,15 @@ export class TransactionService extends BaseService {
         },
       };
 
-      // ✅ Send request to Midtrans
+      // Send request to Midtrans
       const response = await axios.post(
         this.midtransUrl,
         {
           transaction_details: {
             order_id: orderId,
-            gross_amount: totalItemPrice, // ✅ Send total before discount
+            gross_amount: totalItemPrice, // Send gross amount before tax
           },
-          item_details: data.items, // ✅ Midtrans handles discount separately
+          item_details: data.items, // Midtrans handles discount separately
           customer_details: customerDetails,
           enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
           expiry: {
