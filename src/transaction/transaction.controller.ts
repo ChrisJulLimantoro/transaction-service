@@ -79,13 +79,31 @@ export class TransactionController {
       console.log('ya');
       const totalPrice = data.grossAmount;
       const discountAmount = subTotalPrice - totalPrice;
+      const date = new Date();
+      // Ambil store dan count transaksi sebelumnya
+      const store = await this.prisma.store.findUnique({
+        where: { id: String(data.storeId) },
+        select: { code: true }, // Ambil kode store
+      });
+
+      // Hitung jumlah transaksi sebelumnya
+      const count = await this.prisma.transaction.count({
+        where: { store_id: String(data.storeId) },
+      });
+
+      // Format kode transaksi baru
+      const code = `SAL/${store?.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/${(
+        count + 1
+      )
+        .toString()
+        .padStart(3, '0')}`;
       const transaction = await this.prisma.transaction.create({
         data: {
           id: String(data.orderId),
           date: new Date(),
-          code: 'TES-' + Math.floor(1000 + Math.random() * 9000),
-          transaction_type: 0, // Default ke penjualan
-          payment_method: 4, // E-Wallet
+          code: code,
+          transaction_type: 1, // Default ke penjualan
+          payment_method: 5, // MIDTRANS
           status: 0, // Waiting Payment
           sub_total_price: subTotalPrice, // ✅ Harga sebelum diskon
           total_price: totalPrice, // ✅ Harga setelah diskon
@@ -119,14 +137,18 @@ export class TransactionController {
           data: {
             transaction: { connect: { id: String(data.orderId) } },
             product_code: { connect: { id: String(item.id) } },
-            transaction_type: 0,
+            transaction_type: 1,
             price: Number(item.price),
             adjustment_price: Number(item.price),
             weight: Number(item.weight || 0),
             discount: Number(item.discount || 0),
             total_price: Number(item.price) * Number(item.quantity),
-            status: 0,
+            status: 1,
           },
+        });
+        await this.prisma.productCode.update({
+          where: { id: item.id },
+          data: { status: 1 },
         });
       }
 
