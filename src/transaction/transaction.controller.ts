@@ -107,6 +107,12 @@ export class TransactionController {
         },
       });
 
+      if (data.voucherOwnedId != null) {
+        await this.prisma.voucherOwned.update({
+          where: { id: data.voucherOwnedId },
+          data: { is_used: true },
+        });
+      }
       // 📦 Simpan produk dalam transaksi (Exclude discount item)
       for (const item of filteredItems) {
         await this.prisma.transactionProduct.create({
