@@ -19,4 +19,13 @@ export class ReviewService {
       },
     });
   }
+
+  async replyReview(id: any, data: any) {
+    return await this.prismaService.transactionReview.update({
+      where: { id },
+      data: {
+        reply_admin: data.reply_admin,
+      },
+    });
+  }
 }

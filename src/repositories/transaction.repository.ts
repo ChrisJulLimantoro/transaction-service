@@ -23,6 +23,7 @@ export class TransactionRepository extends BaseRepository<any> {
         },
         include: {
           product_code: true,
+          TransactionReview: true,
         },
       },
       employee: true,
