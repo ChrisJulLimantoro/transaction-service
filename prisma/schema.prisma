@@ -305,8 +305,6 @@ model TransactionReview {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
-  User       User?    @relation(fields: [userId], references: [id])
-  userId     String?  @db.Uuid
 
   @@map("transaction_reviews")
 }
@@ -345,7 +343,6 @@ model User {
   created_at        DateTime            @default(now())
   updated_at        DateTime            @updatedAt
   deleted_at        DateTime?
-  TransactionReview TransactionReview[]
 
   @@index([deleted_at]) // optimize for soft delete
   @@index([email]) // optimize for query
