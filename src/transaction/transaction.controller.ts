@@ -10,6 +10,7 @@ import {
 } from '@nestjs/microservices';
 import { TransactionService } from './transaction.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { channel } from 'diagnostics_channel';
 
 @Controller('transaction')
 export class TransactionController {
@@ -39,6 +40,39 @@ export class TransactionController {
   }
 
   // Marketplace Endpoint
+
+  @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
+  async handleNotification(@Payload() query: any): Promise<any> {
+    try {
+      console.log('Notification received from Midtrans (Microservice):', query);
+      const { transaction_status, order_id } = query;
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: order_id },
+        include: {
+          customer: true,
+        },
+      });
+      if (transaction_status === 'settlement') {
+        await this.prisma.transaction.update({
+          where: { id: order_id },
+          data: { status: 1 },
+        });
+        this.marketplaceClient.emit('transaction_settlement', {
+          id: transaction.id,
+        });
+        return {
+          success: true,
+          redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+        };
+      }
+    } catch (error) {
+      console.error('Error processing transaction:', error.message);
+      return {
+        success: false,
+        message: error.message || 'Failed to process transaction',
+      };
+    }
+  }
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
   async createTransactionMarketplace(
     @Payload() data: any,
