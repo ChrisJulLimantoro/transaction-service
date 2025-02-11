@@ -5,9 +5,7 @@ import { BaseRepository } from 'src/repositories/base.repository';
 @Injectable()
 export class UserRepository extends BaseRepository<any> {
   constructor(prisma: PrismaService) {
-    const relations = {
-      roles: { include: { role: true } },
-    };
+    const relations = {};
     super(prisma, 'user', relations, true); // 'user' is the Prisma model name
   }
 

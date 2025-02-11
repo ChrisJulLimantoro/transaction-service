@@ -9,6 +9,7 @@ import {
 } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { ReviewService } from './review.service';
+import { Describe } from 'src/decorator/describe.decorator';
 
 @Controller('review')
 export class ReviewController {
@@ -19,6 +20,10 @@ export class ReviewController {
   ) {}
 
   @MessagePattern({ cmd: 'put:review/*' })
+  @Describe({
+    description: 'comment on a review',
+    fe: ['transaction/sales:edit', 'transaction/sales:detail'],
+  })
   async replyReview(@Payload() data: any) {
     const response = await this.reviewService.replyReview(
       data.params.id,

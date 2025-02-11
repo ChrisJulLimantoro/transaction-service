@@ -11,6 +11,8 @@ import {
 import { TransactionService } from './transaction.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { channel } from 'diagnostics_channel';
+import { Describe } from 'src/decorator/describe.decorator';
+import { Exempt } from 'src/decorator/exempt.decorator';
 
 @Controller('transaction')
 export class TransactionController {
@@ -22,18 +24,30 @@ export class TransactionController {
   ) {}
 
   @MessagePattern({ cmd: 'get:transaction' })
+  @Describe({
+    description: 'Get All Transaction',
+    fe: ['transaction/sales:open'],
+  })
   async getTransaction(@Payload() data: any) {
-    const filter = data.body;
+    const filter = { store_id: data.body.store_id };
     return await this.transactionService.findAll(filter);
   }
 
   @MessagePattern({ cmd: 'get:transaction/*' })
+  @Describe({
+    description: 'Get Transaction By ID',
+    fe: ['transaction/sales:edit', 'transaction/sales:detail'],
+  })
   async getTransactionById(@Payload() data: any) {
     const id = data.params.id;
     return await this.transactionService.findOne(id);
   }
 
   @MessagePattern({ cmd: 'post:transaction' })
+  @Describe({
+    description: 'Create Transaction',
+    fe: ['transaction/sales:add'],
+  })
   async createTransaction(@Payload() data: any) {
     const response = await this.transactionService.create(data.body);
     return response;
@@ -42,6 +56,7 @@ export class TransactionController {
   // Marketplace Endpoint
 
   @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
+  @Exempt()
   async handleNotification(@Payload() query: any): Promise<any> {
     try {
       console.log('Notification received from Midtrans (Microservice):', query);
@@ -73,7 +88,9 @@ export class TransactionController {
       };
     }
   }
+
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
+  @Exempt()
   async createTransactionMarketplace(
     @Payload() data: any,
     @Ctx() context: RmqContext,

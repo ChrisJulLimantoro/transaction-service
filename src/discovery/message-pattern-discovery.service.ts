@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
-import {
-  PATTERN_METADATA,
-  PATTERN_HANDLER_METADATA,
-} from '@nestjs/microservices/constants';
+import { PATTERN_METADATA } from '@nestjs/microservices/constants';
 import { EXEMPT_PATTERN_METADATA } from '../decorator/exempt.decorator';
 import { DESCRIBE_PATTERN_METADATA } from '../decorator/describe.decorator';
 
@@ -31,7 +28,6 @@ export class MessagePatternDiscoveryService {
           this.exploreMethodMetadata(instance, method, messagePatterns),
       );
     });
-    console.log(messagePatterns);
     return messagePatterns;
   }
   exploreMethodMetadata(instance: any, method: string, messagePatterns: any[]) {
@@ -43,7 +39,7 @@ export class MessagePatternDiscoveryService {
       this.reflector.get<boolean>(EXEMPT_PATTERN_METADATA, instance[method]) ||
       false;
 
-    const desribePattern = this.reflector.get<string>(
+    const desribePattern = this.reflector.get<Record<string, any>>(
       DESCRIBE_PATTERN_METADATA,
       instance[method],
     );
@@ -51,7 +47,9 @@ export class MessagePatternDiscoveryService {
     if (messagePattern && !isExempt) {
       messagePatterns.push({
         name: messagePattern[0].cmd,
-        description: desribePattern?.[0] ?? 'No description',
+        description: desribePattern.description,
+        pages: desribePattern.fe,
+        service: 'transaction',
       });
     }
   }

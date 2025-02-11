@@ -19,7 +19,10 @@ export class VoucherController {
   ) {}
 
   @MessagePattern({ cmd: 'get:voucher/*/store' })
-  @Describe('Get Vouchers By Store')
+  @Describe({
+    description: 'Get Vouchers By Store',
+    fe: ['marketplace/voucher:open'],
+  })
   async getByStore(@Payload() data: any): Promise<any> {
     try {
       const result = await this.voucherService.getByStore(data.params.store_id);
@@ -39,7 +42,10 @@ export class VoucherController {
     }
   }
   @MessagePattern({ cmd: 'get:voucher/*/id' })
-  @Describe('Get Voucher By ID')
+  @Describe({
+    description: 'Get Voucher By ID',
+    fe: ['marketplace/voucher:edit', 'marketplace/voucher:detail'],
+  })
   async getById(@Payload() data: any): Promise<any> {
     try {
       const result = await this.voucherService.getById(data.params.id);
@@ -60,7 +66,7 @@ export class VoucherController {
   }
 
   @MessagePattern({ cmd: 'post:voucher' })
-  @Describe('Create Voucher')
+  @Describe({ description: 'Create Voucher', fe: ['marketplace/voucher:add'] })
   async create(@Payload() data: any): Promise<any> {
     try {
       const result = await this.voucherService.create(data.body);
@@ -85,7 +91,7 @@ export class VoucherController {
   }
 
   @MessagePattern({ cmd: 'put:voucher/*' })
-  @Describe('Update Voucher')
+  @Describe({ description: 'Update Voucher', fe: ['marketplace/voucher:edit'] })
   async update(@Payload() data: any): Promise<any> {
     console.log(data);
     const param = data.params;
@@ -113,7 +119,10 @@ export class VoucherController {
   }
 
   @MessagePattern({ cmd: 'delete:voucher/*' })
-  @Describe('Soft Delete Voucher')
+  @Describe({
+    description: 'Soft Delete Voucher',
+    fe: ['marketplace/voucher:delete'],
+  })
   async delete(@Payload() data: any): Promise<any> {
     const param = data.params;
     try {
