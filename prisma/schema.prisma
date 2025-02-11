@@ -49,12 +49,12 @@ model Type {
 }
 
 model Product {
-  id          String  @id @default(uuid()) @db.Uuid
-  code        String
-  name        String
-  status      Int // 0: Inactive, 1: Active, 2: Sold Out
-  type_id     String  @db.Uuid
-  store_id    String  @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  code     String
+  name     String
+  status   Int // 0: Inactive, 1: Active, 2: Sold Out
+  type_id  String @db.Uuid
+  store_id String @db.Uuid
 
   type          Type          @relation(fields: [type_id], references: [id])
   store         Store         @relation(fields: [store_id], references: [id])
@@ -176,9 +176,10 @@ model Customer {
   transactions Transaction[]
   vouchers     VoucherOwned[]
 
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  deleted_at        DateTime?
+  TransactionReview TransactionReview[]
 
   @@index([deleted_at])
   @@map("customers")
@@ -234,7 +235,7 @@ model Transaction {
   code             String
   transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
   payment_method   Int // 1: Cash, 2: Bank Transfer, 3: Credit Card, 4: Debit Card
-  paid_amount     Decimal   @db.Decimal @default(0) // Current Paid Ammount
+  paid_amount      Decimal   @default(0) @db.Decimal // Current Paid Ammount
   payment_link     String? // Payment link bisa expired
   poin_earned      Int       @default(0)
   expired_at       DateTime? // Expired payment link
@@ -251,7 +252,7 @@ model Transaction {
   store                  Store                  @relation(fields: [store_id], references: [id])
   customer               Customer               @relation(fields: [customer_id], references: [id])
   voucher_used           VoucherOwned?          @relation(fields: [voucher_own_id], references: [id])
-  employee                   User?              @relation(fields: [employee_id], references: [id])
+  employee               User?                  @relation(fields: [employee_id], references: [id])
   transaction_products   TransactionProduct[]
   transaction_operations TransactionOperation[]
 
@@ -268,8 +269,8 @@ model TransactionProduct {
   transaction_id   String  @db.Uuid
   product_code_id  String  @db.Uuid
   transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
-  name            String?
-  type            String?
+  name             String?
+  type             String?
   weight           Decimal @db.Decimal
   price            Decimal @db.Decimal
   adjustment_price Decimal @db.Decimal
@@ -281,13 +282,31 @@ model TransactionProduct {
   transaction  Transaction @relation(fields: [transaction_id], references: [id])
   product_code ProductCode @relation(fields: [product_code_id], references: [id])
 
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+  deleted_at        DateTime?
+  TransactionReview TransactionReview?
 
   @@index([deleted_at])
   @@index([transaction_id])
   @@map("transaction_products")
+}
+
+model TransactionReview {
+  id                     String  @id @default(uuid()) @db.Uuid
+  transaction_product_id String  @unique @db.Uuid
+  customer_id            String  @db.Uuid
+  rating                 Int // 1-5
+  review                 String? @db.Text
+  reply_admin            String?
+
+  transaction_product TransactionProduct @relation(fields: [transaction_product_id], references: [id])
+  customer            Customer           @relation(fields: [customer_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("transaction_reviews")
 }
 
 model TransactionOperation {
@@ -315,17 +334,17 @@ model TransactionOperation {
 }
 
 model User {
-  id       String   @id @db.Uuid @default(uuid())
-  name     String
-  email   String   @unique
+  id    String @id @default(uuid()) @db.Uuid
+  name  String
+  email String @unique
 
   Transactions Transaction[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  deleted_at DateTime?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  deleted_at        DateTime?
 
-  @@map("users")
   @@index([deleted_at]) // optimize for soft delete
   @@index([email]) // optimize for query
+  @@map("users")
 }

@@ -2,9 +2,11 @@ import { Controller, Inject } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 import {
   ClientProxy,
+  Ctx,
   EventPattern,
   MessagePattern,
   Payload,
+  RmqContext,
 } from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
 import { Exempt } from 'src/decorator/exempt.decorator';
@@ -138,9 +140,12 @@ export class VoucherController {
 
   @EventPattern({ cmd: 'purchase_voucher' })
   @Exempt()
-  async deleteUser(@Payload() data: any) {
+  async deleteUser(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log(data);
     const response = await this.voucherService.purchaseVoucher(data);
+    if (response) {
+      context.getChannelRef().ack(context.getMessage());
+    }
     return response;
     // const response = await this.customerService.deleteUser(data.id);
     // return response;
