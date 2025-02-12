@@ -136,13 +136,32 @@ model Store {
   transactions Transaction[]
   vouchers     Voucher[]
 
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  deleted_at  DateTime?
+  BankAccount BankAccount[]
+
+  @@index([deleted_at])
+  @@index([company_id])
+  @@map("stores")
+}
+
+model BankAccount {
+  id             String  @id @default(uuid()) @db.Uuid
+  store_id       String  @db.Uuid
+  bank_name      String
+  account_number String  @unique
+  account_holder String
+
+  store Store @relation(fields: [store_id], references: [id])
+
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
   @@index([deleted_at])
-  @@index([company_id])
-  @@map("stores")
+  @@index([store_id])
+  @@map("bank_accounts")
 }
 
 model Operation {
@@ -340,9 +359,9 @@ model User {
 
   Transactions Transaction[]
 
-  created_at        DateTime            @default(now())
-  updated_at        DateTime            @updatedAt
-  deleted_at        DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   @@index([deleted_at]) // optimize for soft delete
   @@index([email]) // optimize for query
