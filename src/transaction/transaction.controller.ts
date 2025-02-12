@@ -54,7 +54,6 @@ export class TransactionController {
   }
 
   // Marketplace Endpoint
-
   @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
   @Exempt()
   async handleNotification(@Payload() query: any): Promise<any> {
@@ -239,6 +238,8 @@ export class TransactionController {
         }, // Return the taxAmount
       };
     } catch (error) {
+      const channel = context.getChannelRef();
+      channel.nack(context.getMessage());
       console.error('Error processing transaction:', error.message);
       return {
         success: false,
