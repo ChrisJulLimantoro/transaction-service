@@ -1,11 +1,11 @@
 import { Controller } from '@nestjs/common';
+import { AccountService } from './account.service';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
-import { OperationService } from './operation.service';
 
-@Controller('operation')
-export class OperationController {
-  constructor(private readonly service: OperationService) {}
+@Controller()
+export class AccountController {
+  constructor(private readonly service: AccountService) {}
 
   private async handleEvent(
     context: RmqContext,
@@ -25,35 +25,37 @@ export class OperationController {
       channel.nack(originalMsg);
     }
   }
-
-  @EventPattern({ cmd: 'operation_created' })
+  
+  @EventPattern({ cmd: 'account_created' })
   @Exempt()
-  async operationCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    console.log('operation data created', data);
+  async accountCreated(@Payload() data: any, @Ctx() context: RmqContext) {
     await this.handleEvent(
       context,
       () => this.service.create(data),
-      'Error processing operation_created event',
+      'Error processing account_created event',
     );
+    console.log('account created: ', data);
   }
 
-  @EventPattern({ cmd: 'operation_updated' })
+  @EventPattern({ cmd: 'account_updated' })
   @Exempt()
-  async operationUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
+  async accountUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
     await this.handleEvent(
       context,
       () => this.service.update(data.id, data),
-      'Error processing operation_updated event',
+      'Error processing account_updated event',
     );
+    console.log('account updated: ', data);
   }
 
-  @EventPattern({ cmd: 'operation_deleted' })
+  @EventPattern({ cmd: 'account_deleted' })
   @Exempt()
-  async operationDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
+  async accountDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
     await this.handleEvent(
       context,
       () => this.service.delete(data),
-      'Error processing operation_deleted event',
+      'Error processing account_deleted event',
     );
+    console.log('account deleted received: ', data);
   }
 }
