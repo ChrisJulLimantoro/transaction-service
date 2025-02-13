@@ -18,6 +18,9 @@ import { UserModule } from './user/user.module';
 import { ReviewModule } from './review/review.module';
 import { BankModule } from './bank/bank.module';
 import { AccountModule } from './account/account.module';
+import { PayoutController } from './payout/payout.controller';
+import { PayoutService } from './payout/payout.service';
+import { PayoutModule } from './payout/payout.module';
 
 @Module({
   imports: [
@@ -38,8 +41,9 @@ import { AccountModule } from './account/account.module';
     ReviewModule,
     BankModule,
     AccountModule,
+    PayoutModule,
   ],
-  controllers: [AppController],
-  providers: [MessagePatternDiscoveryService],
+  controllers: [AppController, PayoutController],
+  providers: [MessagePatternDiscoveryService, PayoutService],
 })
 export class AppModule {}

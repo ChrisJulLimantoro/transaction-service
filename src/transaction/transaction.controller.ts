@@ -51,7 +51,7 @@ export class TransactionController {
   })
   async createTransaction(@Payload() data: any) {
     const response = await this.transactionService.create(data.body);
-    console.log('this is reponse format',response);
+    console.log('this is reponse format', response);
     if (response.success) {
       this.financeClient.emit('transaction_created', response);
     }
@@ -65,25 +65,64 @@ export class TransactionController {
     try {
       console.log('Notification received from Midtrans (Microservice):', query);
       const { transaction_status, order_id } = query;
+
       const transaction = await this.prisma.transaction.findUnique({
         where: { id: order_id },
         include: {
           customer: true,
+          store: true,
         },
       });
+
+      if (!transaction) {
+        console.error('Transaction not found:', order_id);
+        return { success: false, message: 'Transaction not found' };
+      }
+
       if (transaction_status === 'settlement') {
-        await this.prisma.transaction.update({
-          where: { id: order_id },
-          data: { status: 1 },
-        });
-        this.marketplaceClient.emit('transaction_settlement', {
-          id: transaction.id,
-        });
+        const storeId = transaction.store_id;
+        const totalPrice = transaction.total_price;
+        const transactionCode = transaction.code;
+        if (transaction.status != 1) {
+          await this.prisma.transaction.update({
+            where: { id: order_id },
+            data: { status: 1 },
+          });
+          await this.prisma.store.update({
+            where: { id: storeId },
+            data: {
+              balance: { increment: totalPrice },
+            },
+          });
+
+          await this.prisma.balanceLog.create({
+            data: {
+              store_id: storeId,
+              amount: totalPrice,
+              type: 'INCOME',
+              information: `Pemasukan dari transaksi #${transactionCode}`,
+            },
+          });
+
+          this.marketplaceClient.emit('transaction_settlement', {
+            id: transaction.id,
+          });
+
+          return {
+            success: true,
+            redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+          };
+        }
         return {
-          success: true,
-          redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+          success: false,
+          message: 'Transaction is not in settlement status',
         };
       }
+
+      return {
+        success: false,
+        message: 'Transaction is not in settlement status',
+      };
     } catch (error) {
       console.error('Error processing transaction:', error.message);
       return {

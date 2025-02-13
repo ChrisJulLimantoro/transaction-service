@@ -156,6 +156,7 @@ model BalanceLog {
   store_id   String   @db.Uuid
   amount     Decimal  @db.Decimal
   type       String // "INCOME", "PAYOUT_REQUEST"
+  information String?  @db.Text
   created_at DateTime @default(now())
 
   store Store @relation(fields: [store_id], references: [id])
@@ -170,6 +171,7 @@ model PayoutRequest {
   bank_account_id String    @db.Uuid
   amount          Decimal   @db.Decimal
   status          Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
+  information     String?   @db.Text
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   approved_at     DateTime?
