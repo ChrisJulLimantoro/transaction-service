@@ -163,17 +163,20 @@ model BalanceLog {
 }
 
 model PayoutRequest {
-  id          String    @id @default(uuid()) @db.Uuid
-  store_id    String    @db.Uuid
-  amount      Decimal   @db.Decimal
-  status      Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  approved_at DateTime?
+  id              String    @id @default(uuid()) @db.Uuid
+  store_id        String    @db.Uuid
+  bank_account_id String    @db.Uuid
+  amount          Decimal   @db.Decimal
+  status          Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  approved_at     DateTime?
 
-  store Store @relation(fields: [store_id], references: [id])
+  store       Store       @relation(fields: [store_id], references: [id])
+  bankAccount BankAccount @relation(fields: [bank_account_id], references: [id])
 
   @@index([store_id])
+  @@index([bank_account_id])
   @@map("payout_requests")
 }
 
@@ -186,9 +189,10 @@ model BankAccount {
 
   store Store @relation(fields: [store_id], references: [id])
 
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  PayoutRequest PayoutRequest[]
 
   @@index([deleted_at])
   @@index([store_id])
