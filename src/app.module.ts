@@ -16,6 +16,7 @@ import { CustomerModule } from './customer/customer.module';
 import { VoucherModule } from './voucher/voucher.module';
 import { UserModule } from './user/user.module';
 import { ReviewModule } from './review/review.module';
+import { BankModule } from './bank/bank.module';
 import { AccountModule } from './account/account.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { AccountModule } from './account/account.module';
     VoucherModule,
     UserModule,
     ReviewModule,
+    BankModule,
     AccountModule,
   ],
   controllers: [AppController],
