@@ -31,6 +31,57 @@ export class PayoutController {
     }
   }
 
+  @MessagePattern({ cmd: 'get:payout_requests' })
+  @Describe({
+    description: 'Get All Payout Requests ordered by created_at',
+    fe: ['marketplace/payout_request:open'],
+  })
+  async getAllPayoutRequests(): Promise<any> {
+    try {
+      const result = await this.payoutService.getAllPayoutRequests();
+      return {
+        success: true,
+        message: 'Success retrieving all payout requests!',
+        data: result,
+        statusCode: 200,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        errors: [error.message],
+        statusCode: 500,
+      };
+    }
+  }
+  @MessagePattern({ cmd: 'patch:payout_requests/*' })
+  @Describe({
+    description: 'Update Payout Request (Approve/Reject & Upload Proof)',
+    fe: ['marketplace/payout_request:edit'],
+  })
+  async updatePayoutRequest(@Payload() data: any): Promise<any> {
+    try {
+      const { id } = data.params;
+      const { proofUrl } = data.body;
+
+      const result = await this.payoutService.saveProof(id, proofUrl);
+
+      return {
+        success: true,
+        message: 'Payout request updated successfully!',
+        data: result,
+        statusCode: 200,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        errors: [error.message],
+        statusCode: 500,
+      };
+    }
+  }
+
   @MessagePattern({ cmd: 'get:payout_request/*/store' })
   @Describe({
     description: 'Get Payout Requests By Store',

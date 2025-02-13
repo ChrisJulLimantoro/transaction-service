@@ -152,12 +152,12 @@ model Store {
 }
 
 model BalanceLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  store_id   String   @db.Uuid
-  amount     Decimal  @db.Decimal
-  type       String // "INCOME", "PAYOUT_REQUEST"
+  id          String   @id @default(uuid()) @db.Uuid
+  store_id    String   @db.Uuid
+  amount      Decimal  @db.Decimal
+  type        String // "INCOME", "PAYOUT_REQUEST"
   information String?  @db.Text
-  created_at DateTime @default(now())
+  created_at  DateTime @default(now())
 
   store Store @relation(fields: [store_id], references: [id])
 
@@ -172,6 +172,7 @@ model PayoutRequest {
   amount          Decimal   @db.Decimal
   status          Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
   information     String?   @db.Text
+  proof           String?   @db.Text
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   approved_at     DateTime?
@@ -185,27 +186,27 @@ model PayoutRequest {
 }
 
 model Account {
-  id  String   @id @db.Uuid
-  code Int
-  name        String
+  id              String  @id @db.Uuid
+  code            Int
+  name            String
   account_type_id Int //  kas/bank/giro/piutang/hutang
-  description String?
-  store_id String? @db.Uuid
-  company_id String @db.Uuid
-  deactive Boolean @default(false)
-  
+  description     String?
+  store_id        String? @db.Uuid
+  company_id      String  @db.Uuid
+  deactive        Boolean @default(false)
+
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  store  Store?  @relation(fields: [store_id], references: [id])
-  company Company @relation(fields: [company_id], references: [id])
+  store     Store?      @relation(fields: [store_id], references: [id])
+  company   Company     @relation(fields: [company_id], references: [id])
   operation Operation[]
 
-  @@map("accounts")
   @@index([deleted_at])
   @@index([company_id])
   @@index([store_id])
+  @@map("accounts")
 }
 
 model BankAccount {
@@ -228,17 +229,17 @@ model BankAccount {
 }
 
 model Operation {
-  id       String  @id @default(uuid()) @db.Uuid
-  code     String
-  name     String
-  price    Decimal @db.Decimal
-  uom      String
-  store_id String  @db.Uuid
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String
+  name       String
+  price      Decimal @db.Decimal
+  uom        String
+  store_id   String  @db.Uuid
   account_id String? @db.Uuid
 
   store                  Store                  @relation(fields: [store_id], references: [id])
   transaction_operations TransactionOperation[]
-  account Account? @relation(fields: [account_id], references: [id])
+  account                Account?               @relation(fields: [account_id], references: [id])
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt

@@ -9,6 +9,31 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PayoutService {
   constructor(private prisma: PrismaService) {}
 
+  async saveProof(payoutId: string, proofUrl: string) {
+    const payout = await this.prisma.payoutRequest.findUnique({
+      where: { id: payoutId },
+    });
+
+    if (!payout) {
+      throw new NotFoundException('Payout request not found');
+    }
+
+    if (payout.status !== 0) {
+      throw new BadRequestException('Payout request is already processed');
+    }
+
+    const updatedPayout = await this.prisma.payoutRequest.update({
+      where: { id: payoutId },
+      data: {
+        proof: proofUrl,
+        status: 1, // Mark as completed
+        approved_at: new Date(),
+      },
+    });
+
+    return updatedPayout;
+  }
+
   async createPayout(data: {
     store_id: string;
     bank_account_id: string;
@@ -114,5 +139,12 @@ export class PayoutService {
     }
 
     return updatedPayout;
+  }
+
+  async getAllPayoutRequests() {
+    return this.prisma.payoutRequest.findMany({
+      include: { bankAccount: true, store: true },
+      orderBy: { created_at: 'desc' },
+    });
   }
 }
