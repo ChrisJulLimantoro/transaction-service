@@ -8,6 +8,7 @@ import {
 } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { CustomerService } from './customer.service';
+import { Describe } from 'src/decorator/describe.decorator';
 
 @Controller('customer')
 export class CustomerController {
@@ -70,7 +71,15 @@ export class CustomerController {
   }
 
   @MessagePattern({ cmd: 'get:customer' })
-  @Exempt()
+  @Describe({
+    description: 'Get all customer registered',
+    fe: [
+      'transaction/sales:add',
+      'transaction/sales:edit',
+      'transaction/sales:detail',
+      'customer:all',
+    ],
+  })
   async getCustomer(@Payload() data: any) {
     const response = await this.customerService.findAll(data);
     return response;
