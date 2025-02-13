@@ -90,11 +90,16 @@ export class TransactionService extends BaseService {
       });
     }
 
+    var transDetails = [];
     for (const detail of transactionDetails) {
-      await this.createTransactionDetails(detail);
+      var newdetail = await this.createTransactionDetails(detail);
+      transDetails.push(newdetail);
     }
 
-    return CustomResponse.success('Transaction created successfully', null);
+    data.transaction_details = transDetails;
+    console.log('Transaction details', data.transaction_details);
+
+    return CustomResponse.success('Transaction created successfully', data);
   }
 
   async createTransactionDetails(data: any) {
@@ -105,14 +110,14 @@ export class TransactionService extends BaseService {
         transactionDetail,
         CreateTransactionProductRequest.schema(),
       );
-      await this.transactionProductRepository.create(validatedData);
+      return await this.transactionProductRepository.create(validatedData);
     } else {
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionOperationRequest.schema(),
       );
-      await this.transactionOperationRepository.create(validatedData);
+      return await this.transactionOperationRepository.create(validatedData);
     }
   }
 

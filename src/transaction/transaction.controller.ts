@@ -21,6 +21,7 @@ export class TransactionController {
     private readonly prisma: PrismaService,
     @Inject('MARKETPLACE')
     private readonly marketplaceClient: ClientProxy,
+    @Inject('FINANCE') private readonly financeClient: ClientProxy,
   ) {}
 
   @MessagePattern({ cmd: 'get:transaction' })
@@ -50,6 +51,10 @@ export class TransactionController {
   })
   async createTransaction(@Payload() data: any) {
     const response = await this.transactionService.create(data.body);
+    console.log('this is reponse format',response);
+    if (response.success) {
+      this.financeClient.emit('transaction_created', response);
+    }
     return response;
   }
 

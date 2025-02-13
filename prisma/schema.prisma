@@ -152,6 +152,7 @@ model Operation {
   price    Decimal @db.Decimal
   uom      String
   store_id String  @db.Uuid
+  account_id String? @db.Uuid
 
   store                  Store                  @relation(fields: [store_id], references: [id])
   transaction_operations TransactionOperation[]
