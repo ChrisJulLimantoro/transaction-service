@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { BaseService } from 'src/base.service';
 import { TransactionRepository } from 'src/repositories/transaction.repository';
@@ -12,6 +12,8 @@ import { CreateTransactionOperationRequest } from './dto/create-transaction-oper
 import { TransactionProductRepository } from 'src/repositories/transaction-product.repository';
 import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ProductCodeRepository } from 'src/repositories/product-code.repository';
+import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -23,8 +25,10 @@ export class TransactionService extends BaseService {
     private readonly transactionRepository: TransactionRepository,
     private readonly transactionProductRepository: TransactionProductRepository,
     private readonly transactionOperationRepository: TransactionOperationRepository,
+    private readonly productCodeRepository: ProductCodeRepository,
     protected readonly validation: ValidationService,
     private readonly prisma: PrismaService,
+    @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
   ) {
     super(validation);
   }
@@ -86,24 +90,50 @@ export class TransactionService extends BaseService {
         transaction_type: transaction.transaction_type,
         weight: detail.quantity,
         unit: detail.quantity,
-        status: 2,
+        status: 1,
       });
     }
 
     var transDetails = [];
+    console.log('transactionDetails', transactionDetails);
     for (const detail of transactionDetails) {
-      var newdetail = await this.createDetail(detail);
-      transDetails.push(newdetail);
+      try {
+        var newdetail = await this.createDetail(detail);
+      } catch (error) {
+        // delete transaction if failed to create detail
+        console.error('Failed to create transaction detail', error);
+        await this.repository.delete(transaction.id);
+        return CustomResponse.error(
+          'Failed to create transaction detail',
+          null,
+          500,
+        );
+      }
+      if (newdetail.success) transDetails.push(newdetail.data);
     }
 
     data.transaction_details = transDetails;
-    console.log('Transaction details', data.transaction_details);
-
     return CustomResponse.success('Transaction created successfully', data);
   }
 
-  async createDetail(data: any) {
-    console.log(data);
+  async update(id: string, data: any): Promise<CustomResponse> {
+    if (data.status) {
+      // update status of the detail too
+      const transaction = await this.repository.findOne(id);
+      if (!transaction) {
+        return CustomResponse.error('Transaction not found', null, 404);
+      }
+      const products = transaction.transaction_products;
+      for (const product of products) {
+        await this.transactionProductRepository.update(product.id, {
+          status: data.status,
+        });
+      }
+    }
+    return super.update(id, data);
+  }
+
+  async createDetail(data: any): Promise<CustomResponse> {
     const transaction = await this.repository.findOne(data.transaction_id);
     if (!transaction) {
       return CustomResponse.error(
@@ -117,12 +147,39 @@ export class TransactionService extends BaseService {
     data.transaction_type = transaction.transaction_type;
     data.status = transaction.status == 2 ? 2 : 1;
     if (data.detail_type == 'product') {
+      // Check if item available
+      const product = await this.productCodeRepository.findOne(
+        data.product_code_id,
+      );
+      console.log(product);
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      if (product.status != 0 && transaction.transaction_type == 1) {
+        throw new Error('Product already sold');
+      }
       const transactionDetail = new CreateTransactionProductRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionProductRequest.schema(),
       );
       result = await this.transactionProductRepository.create(validatedData);
+      // Update product status Locally
+      const code = await this.productCodeRepository.update(
+        data.product_code_id,
+        {
+          status: data.transaction_type == 1 ? 1 : 0,
+        },
+      );
+      console.log('code', code);
+      // Broadcast the update to other services
+      this.inventoryClient.emit(
+        { cmd: 'product_code_updated' },
+        {
+          id: code.id,
+          status: code.status,
+        },
+      );
     } else {
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
@@ -133,7 +190,7 @@ export class TransactionService extends BaseService {
     }
 
     if (!result) {
-      return CustomResponse.error('Failed to create transaction detail', null);
+      throw new Error('Failed to create transaction detail');
     }
     const transactionRes = await this.syncDetail(data.transaction_id);
     result.transaction = transactionRes;
@@ -191,6 +248,22 @@ export class TransactionService extends BaseService {
 
     if (product) {
       await this.transactionProductRepository.delete(id);
+      // Update product status Locally
+      const code = await this.productCodeRepository.update(
+        product.product_code_id,
+        {
+          status: product.transaction_type == 1 ? 0 : 1,
+        },
+      );
+      console.log('code deleted', code);
+      // Broadcast the update to other services
+      this.inventoryClient.emit(
+        { cmd: 'product_code_updated' },
+        {
+          id: code.id,
+          status: code.status,
+        },
+      );
     } else {
       await this.transactionOperationRepository.delete(id);
     }
@@ -264,6 +337,22 @@ export class TransactionService extends BaseService {
     try {
       for (const detail of transactionProduct) {
         await this.transactionProductRepository.delete(detail.id);
+        // Update product status Locally
+        const code = await this.productCodeRepository.update(
+          detail.product_code_id,
+          {
+            status: detail.transaction_type == 1 ? 0 : 1,
+          },
+        );
+        console.log('code deleted', code);
+        // Broadcast the update to other services
+        this.inventoryClient.emit(
+          { cmd: 'product_code_updated' },
+          {
+            id: code.id,
+            status: code.status,
+          },
+        );
       }
       for (const detail of transactionOperation) {
         await this.transactionOperationRepository.delete(detail.id);
