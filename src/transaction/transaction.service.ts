@@ -205,13 +205,13 @@ export class TransactionService extends BaseService {
     );
   }
 
-  async syncDetail(id: string) {
+  async syncDetail(transaction_id: string) {
     // Calculate for price and responsibility
     const operations = await this.transactionOperationRepository.findAll({
-      transaction_id: id,
+      transaction_id: transaction_id,
     });
     const products = await this.transactionProductRepository.findAll({
-      transaction_id: id,
+      transaction_id: transaction_id,
     });
 
     let subtotal = 0;
@@ -238,7 +238,10 @@ export class TransactionService extends BaseService {
       tax_price: subtotal * (tax / 100),
       total_price: subtotal * ((tax + 100) / 100),
     };
-    const res = await this.transactionRepository.update(id, updateData);
+    const res = await this.transactionRepository.update(
+      transaction_id,
+      updateData,
+    );
     return updateData;
   }
 
