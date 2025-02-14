@@ -111,6 +111,7 @@ model Company {
 
   stores     Store[]
   categories Category[]
+  accounts   Account[]
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
@@ -130,32 +131,116 @@ model Store {
   is_float_price Boolean @default(false)
   poin_config    Int     @default(0)
   tax_percentage    Decimal @db.Decimal @default(11)
+  balance        Decimal @default(0) @db.Decimal
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]
   operations   Operation[]
   transactions Transaction[]
   vouchers     Voucher[]
+  accounts     Account[]
 
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  BankAccount   BankAccount[]
+  BalanceLog    BalanceLog[]
+  PayoutRequest PayoutRequest[]
 
   @@index([deleted_at])
   @@index([company_id])
   @@map("stores")
 }
 
+model BalanceLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  store_id    String   @db.Uuid
+  amount      Decimal  @db.Decimal
+  type        String // "INCOME", "PAYOUT_REQUEST"
+  information String?  @db.Text
+  created_at  DateTime @default(now())
+
+  store Store @relation(fields: [store_id], references: [id])
+
+  @@index([store_id])
+  @@map("balance_logs")
+}
+
+model PayoutRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  store_id        String    @db.Uuid
+  bank_account_id String    @db.Uuid
+  amount          Decimal   @db.Decimal
+  status          Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
+  information     String?   @db.Text
+  proof           String?   @db.Text
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  approved_at     DateTime?
+
+  store       Store       @relation(fields: [store_id], references: [id])
+  bankAccount BankAccount @relation(fields: [bank_account_id], references: [id])
+
+  @@index([store_id])
+  @@index([bank_account_id])
+  @@map("payout_requests")
+}
+
+model Account {
+  id              String  @id @db.Uuid
+  code            Int
+  name            String
+  account_type_id Int //  kas/bank/giro/piutang/hutang
+  description     String?
+  store_id        String? @db.Uuid
+  company_id      String  @db.Uuid
+  deactive        Boolean @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  store     Store?      @relation(fields: [store_id], references: [id])
+  company   Company     @relation(fields: [company_id], references: [id])
+  operation Operation[]
+
+  @@index([deleted_at])
+  @@index([company_id])
+  @@index([store_id])
+  @@map("accounts")
+}
+
+model BankAccount {
+  id             String @id @default(uuid()) @db.Uuid
+  store_id       String @db.Uuid
+  bank_name      String
+  account_number String @unique
+  account_holder String
+
+  store Store @relation(fields: [store_id], references: [id])
+
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  PayoutRequest PayoutRequest[]
+
+  @@index([deleted_at])
+  @@index([store_id])
+  @@map("bank_accounts")
+}
+
 model Operation {
-  id       String  @id @default(uuid()) @db.Uuid
-  code     String
-  name     String
-  price    Decimal @db.Decimal
-  uom      String
-  store_id String  @db.Uuid
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String
+  name       String
+  price      Decimal @db.Decimal
+  uom        String
+  store_id   String  @db.Uuid
+  account_id String? @db.Uuid
 
   store                  Store                  @relation(fields: [store_id], references: [id])
   transaction_operations TransactionOperation[]
+  account                Account?               @relation(fields: [account_id], references: [id])
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
@@ -341,9 +426,9 @@ model User {
 
   Transactions Transaction[]
 
-  created_at        DateTime            @default(now())
-  updated_at        DateTime            @updatedAt
-  deleted_at        DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   @@index([deleted_at]) // optimize for soft delete
   @@index([email]) // optimize for query

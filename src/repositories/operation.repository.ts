@@ -12,6 +12,7 @@ export class OperationRepository extends BaseRepository<any> {
           deleted_at: null,
         },
       },
+      account: true,
     };
     super(prisma, 'operation', relations, true); // 'role' is the Prisma model name
   }

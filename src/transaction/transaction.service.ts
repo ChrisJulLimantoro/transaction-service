@@ -90,11 +90,16 @@ export class TransactionService extends BaseService {
       });
     }
 
+    var transDetails = [];
     for (const detail of transactionDetails) {
-      await this.createDetail(detail);
+      var newdetail = await this.createDetail(detail);
+      transDetails.push(newdetail);
     }
 
-    return CustomResponse.success('Transaction created successfully', null);
+    data.transaction_details = transDetails;
+    console.log('Transaction details', data.transaction_details);
+
+    return CustomResponse.success('Transaction created successfully', data);
   }
 
   async createDetail(data: any) {
@@ -126,8 +131,6 @@ export class TransactionService extends BaseService {
       );
       result = await this.transactionOperationRepository.create(validatedData);
     }
-
-    console.log(result);
 
     if (!result) {
       return CustomResponse.error('Failed to create transaction detail', null);

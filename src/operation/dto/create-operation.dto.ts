@@ -8,14 +8,16 @@ export class CreateOperationRequest {
   uom: string;
   description: string | null;
   store_id: string;
+  account_id: string;
 
-  constructor({ id, name, code, price, uom, store_id }) {
+  constructor({ id, name, code, price, uom, store_id, account_id }) {
     this.id = id;
     this.name = name;
     this.code = code;
     this.price = parseFloat(price);
     this.uom = uom;
     this.store_id = store_id;
+    this.account_id = account_id;
   }
 
   static schema() {
@@ -26,6 +28,7 @@ export class CreateOperationRequest {
       price: z.number().nonnegative(),
       uom: z.string().max(15),
       store_id: z.string().uuid(),
+      account_id: z.string().uuid().optional().nullable(),
     });
   }
 }
