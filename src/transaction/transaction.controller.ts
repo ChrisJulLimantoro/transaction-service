@@ -30,7 +30,7 @@ export class TransactionController {
     fe: ['transaction/sales:open'],
   })
   async getTransaction(@Payload() data: any) {
-    const filter = { store_id: data.body.store_id };
+    const filter = { store_id: data.body.auth.store_id };
     return await this.transactionService.findAll(filter);
   }
 
@@ -85,10 +85,8 @@ export class TransactionController {
     fe: ['transaction/sales:edit'],
   })
   async updateTransactionDetail(@Payload() data: any) {
-    console.log(data);
     const id = data.params.id;
     const body = data.body;
-    console.log(body.transaction_details);
     return await this.transactionService.updateDetail(id, body);
   }
 

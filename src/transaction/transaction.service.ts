@@ -215,23 +215,24 @@ export class TransactionService extends BaseService {
     });
 
     let subtotal = 0;
-    let tax = 0;
+    let tax = null;
     for (const operation of operations) {
       subtotal +=
         operation.unit * operation.price +
         parseFloat(operation.adjustment_price);
       if (tax == null) {
-        tax = parseFloat(operation.transaction.store.tax);
+        tax = parseFloat(operation.transaction.store.tax_percentage);
       }
     }
     for (const product of products) {
       subtotal +=
         product.weight * product.price + parseFloat(product.adjustment_price);
       if (tax == null) {
-        tax = parseFloat(product.transaction.store.tax);
+        tax = parseFloat(product.transaction.store.tax_percentage);
       }
     }
 
+    console.log('sync tax', tax);
     const updateData = {
       sub_total_price: subtotal,
       tax_price: subtotal * (tax / 100),
