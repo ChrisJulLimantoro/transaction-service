@@ -237,6 +237,7 @@ export class TransactionService extends BaseService {
       sub_total_price: subtotal,
       tax_price: subtotal * (tax / 100),
       total_price: subtotal * ((tax + 100) / 100),
+      paid_amount: subtotal * ((tax + 100) / 100),
     };
     const res = await this.transactionRepository.update(
       transaction_id,
