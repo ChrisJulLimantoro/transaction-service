@@ -21,7 +21,7 @@ export class CreateTransactionProductRequest {
     weight,
     price,
     adjustment_price,
-    discount = 0,
+    discount,
     total_price,
     status,
   }) {
@@ -33,7 +33,7 @@ export class CreateTransactionProductRequest {
     this.weight = parseFloat(weight);
     this.price = parseFloat(price);
     this.adjustment_price = parseFloat(adjustment_price);
-    this.discount = discount;
+    this.discount = parseFloat(discount);
     this.total_price = parseFloat(total_price);
     this.status = parseInt(status);
   }

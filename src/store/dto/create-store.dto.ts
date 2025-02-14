@@ -8,25 +8,26 @@ export class CreateStoreRequest {
   is_flex_price: boolean | null;
   is_float_price: boolean | null;
   poin_config: number | null;
+  tax_percentage: number | null;
 
-  constructor(data: {
-    id: string;
-    code: string;
-    name: string;
-    company_id: string;
-    is_active: boolean | null;
-    is_flex_price: boolean | null;
-    is_float_price: boolean | null;
-    poin_config: number | null;
+  constructor({
+    id,
+    code,
+    name,
+    is_active,
+    is_flex_price,
+    is_float_price,
+    poin_config,
+    tax_percentage,
   }) {
-    this.id = data.id;
-    this.code = data.code;
-    this.name = data.name;
-    this.company_id = data.company_id;
-    this.is_active = data.is_active;
-    this.is_flex_price = data.is_flex_price;
-    this.is_float_price = data.is_float_price;
-    this.poin_config = data.poin_config;
+    this.id = id;
+    this.code = code;
+    this.name = name;
+    this.is_active = is_active;
+    this.is_flex_price = is_flex_price;
+    this.is_float_price = is_float_price;
+    this.poin_config = parseFloat(poin_config);
+    this.tax_percentage = parseFloat(tax_percentage);
   }
 
   static schema() {
@@ -39,6 +40,7 @@ export class CreateStoreRequest {
       is_flex_price: z.boolean().nullable().optional(),
       is_float_price: z.boolean().nullable().optional(),
       poin_config: z.number().nullable().optional(),
+      tax_percentage: z.number().nullable().optional(),
     });
   }
 }

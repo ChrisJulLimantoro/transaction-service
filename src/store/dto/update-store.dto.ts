@@ -6,22 +6,24 @@ export class UpdateStoreRequest {
   is_flex_price: boolean | null;
   is_float_price: boolean | null;
   poin_config: number | null;
+  tax_percentage: number | null;
 
-  constructor(data: {
-    code: string | null;
-    name: string | null;
-    npwp: string | null;
-    is_active: boolean | null;
-    is_flex_price: boolean | null;
-    is_float_price: boolean | null;
-    poin_config: number | null;
+  constructor({
+    code,
+    name,
+    is_active,
+    is_flex_price,
+    is_float_price,
+    poin_config,
+    tax_percentage,
   }) {
-    this.code = data.code;
-    this.name = data.name;
-    this.is_active = data.is_active;
-    this.is_flex_price = data.is_flex_price;
-    this.is_float_price = data.is_float_price;
-    this.poin_config = data.poin_config;
+    this.code = code;
+    this.name = name;
+    this.is_active = is_active;
+    this.is_flex_price = is_flex_price;
+    this.is_float_price = is_float_price;
+    this.poin_config = parseFloat(poin_config);
+    this.tax_percentage = parseFloat(tax_percentage);
   }
 
   static schema() {
@@ -32,6 +34,7 @@ export class UpdateStoreRequest {
       is_flex_price: z.boolean().nullable().optional(),
       is_float_price: z.boolean().nullable().optional(),
       poin_config: z.number().nullable().optional(),
+      tax_percentage: z.number().nullable().optional(),
     });
   }
 }

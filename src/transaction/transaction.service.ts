@@ -91,28 +91,180 @@ export class TransactionService extends BaseService {
     }
 
     for (const detail of transactionDetails) {
-      await this.createTransactionDetails(detail);
+      await this.createDetail(detail);
     }
 
     return CustomResponse.success('Transaction created successfully', null);
   }
 
-  async createTransactionDetails(data: any) {
+  async createDetail(data: any) {
+    console.log(data);
+    const transaction = await this.repository.findOne(data.transaction_id);
+    if (!transaction) {
+      return CustomResponse.error(
+        'Transaction has not created yet.',
+        null,
+        404,
+      );
+    }
     var validatedData = null;
+    var result = null;
+    data.transaction_type = transaction.transaction_type;
+    data.status = transaction.status == 2 ? 2 : 1;
     if (data.detail_type == 'product') {
       const transactionDetail = new CreateTransactionProductRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionProductRequest.schema(),
       );
-      await this.transactionProductRepository.create(validatedData);
+      result = await this.transactionProductRepository.create(validatedData);
     } else {
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionOperationRequest.schema(),
       );
-      await this.transactionOperationRepository.create(validatedData);
+      result = await this.transactionOperationRepository.create(validatedData);
+    }
+
+    console.log(result);
+
+    if (!result) {
+      return CustomResponse.error('Failed to create transaction detail', null);
+    }
+    const transactionRes = await this.syncDetail(data.transaction_id);
+    result.transaction = transactionRes;
+
+    return CustomResponse.success(
+      'Transaction Detail created successfully',
+      result,
+      201,
+    );
+  }
+
+  async updateDetail(id: string, data: any): Promise<CustomResponse> {
+    data.unit = data.quantity;
+    if (data.type == 'Operation') {
+      const transactionDetail =
+        await this.transactionOperationRepository.findOne(id);
+      if (!transactionDetail) {
+        return CustomResponse.error('Transaction Detail not found', null, 404);
+      }
+      const transactionDetailData = new CreateTransactionOperationRequest(data);
+      const validatedData = this.validation.validate(
+        transactionDetailData,
+        CreateTransactionOperationRequest.schema(),
+      );
+      await this.transactionOperationRepository.update(id, validatedData);
+    } else {
+      const transactionDetail =
+        await this.transactionProductRepository.findOne(id);
+      if (!transactionDetail) {
+        return CustomResponse.error('Transaction Detail not found', null, 404);
+      }
+      const transactionDetailData = new CreateTransactionProductRequest(data);
+      const validatedData = this.validation.validate(
+        transactionDetailData,
+        CreateTransactionProductRequest.schema(),
+      );
+      await this.transactionProductRepository.update(id, validatedData);
+    }
+
+    await this.syncDetail(data.transaction_id);
+
+    return CustomResponse.success(
+      'Transaction Detail updated successfully',
+      null,
+    );
+  }
+
+  async deleteDetail(id: string): Promise<CustomResponse> {
+    const product = await this.transactionProductRepository.findOne(id);
+    const operation = await this.transactionOperationRepository.findOne(id);
+
+    if (!product && !operation) {
+      return CustomResponse.error('Transaction Detail not found', null, 404);
+    }
+
+    if (product) {
+      await this.transactionProductRepository.delete(id);
+    } else {
+      await this.transactionOperationRepository.delete(id);
+    }
+
+    await this.syncDetail(
+      product ? product.transaction_id : operation.transaction_id,
+    );
+
+    return CustomResponse.success(
+      'Transaction Detail deleted successfully',
+      null,
+    );
+  }
+
+  async syncDetail(id: string) {
+    // Calculate for price and responsibility
+    const operations = await this.transactionOperationRepository.findAll({
+      transaction_id: id,
+    });
+    const products = await this.transactionProductRepository.findAll({
+      transaction_id: id,
+    });
+
+    let subtotal = 0;
+    let tax = 0;
+    for (const operation of operations) {
+      subtotal +=
+        operation.unit * operation.price +
+        parseFloat(operation.adjustment_price);
+      if (tax == null) {
+        tax = parseFloat(operation.transaction.store.tax);
+      }
+    }
+    for (const product of products) {
+      subtotal +=
+        product.weight * product.price + parseFloat(product.adjustment_price);
+      if (tax == null) {
+        tax = parseFloat(product.transaction.store.tax);
+      }
+    }
+
+    const updateData = {
+      sub_total_price: subtotal,
+      tax_price: subtotal * (tax / 100),
+      total_price: subtotal * ((tax + 100) / 100),
+    };
+    const res = await this.transactionRepository.update(id, updateData);
+    return updateData;
+  }
+
+  async delete(id: string): Promise<CustomResponse> {
+    const transaction = await this.repository.findOne(id);
+    if (!transaction) {
+      return CustomResponse.error('Transaction not found', null, 404);
+    }
+
+    const transactionProduct = await this.prisma.transactionProduct.findMany({
+      where: { transaction_id: id },
+    });
+
+    const transactionOperation =
+      await this.prisma.transactionOperation.findMany({
+        where: { transaction_id: id },
+      });
+
+    try {
+      for (const detail of transactionProduct) {
+        await this.transactionProductRepository.delete(detail.id);
+      }
+      for (const detail of transactionOperation) {
+        await this.transactionOperationRepository.delete(detail.id);
+      }
+
+      await this.repository.delete(id);
+      return CustomResponse.success('Transaction deleted successfully', null);
+    } catch (error) {
+      return CustomResponse.error('Failed to delete transaction', null, 500);
     }
   }
 

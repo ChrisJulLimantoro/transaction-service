@@ -6,7 +6,11 @@ import { BaseRepository } from 'src/repositories/base.repository';
 export class TransactionOperationRepository extends BaseRepository<any> {
   constructor(prisma: PrismaService) {
     const relations = {
-      transaction: true,
+      transaction: {
+        include: {
+          store: true,
+        },
+      },
       operation: true,
     };
     super(prisma, 'transactionOperation', relations, true);

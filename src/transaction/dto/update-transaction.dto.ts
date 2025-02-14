@@ -1,17 +1,36 @@
 import { z } from 'zod';
 export class UpdateTransactionRequest {
-  date: Date;
-  customer_id: string;
+  date: Date | null;
+  customer_id: string | null;
+  employee_id: string | null;
+  payment_method: number | null;
+  paid_amount: number | null;
+  status: number | null;
 
-  constructor(data: { date: string; customer_id: string }) {
-    this.date = new Date(data.date);
-    this.customer_id = data.customer_id;
+  constructor({
+    date,
+    customer_id,
+    employee_id,
+    payment_method,
+    paid_amount,
+    status,
+  }) {
+    this.date = new Date(date);
+    this.customer_id = customer_id;
+    this.employee_id = employee_id;
+    this.payment_method = parseInt(payment_method);
+    this.paid_amount = parseFloat(paid_amount);
+    this.status = parseInt(status);
   }
 
   static schema() {
     return z.object({
-      date: z.date(),
-      customer_id: z.string().uuid(),
+      date: z.date().nullable().optional(),
+      customer_id: z.string().nullable().optional(),
+      employee_id: z.string().nullable().optional(),
+      payment_method: z.number().nullable().optional(),
+      paid_amount: z.number().min(0).nullable().optional(),
+      status: z.number().nullable().optional(),
     });
   }
 }

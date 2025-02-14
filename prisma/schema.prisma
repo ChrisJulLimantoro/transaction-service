@@ -129,6 +129,7 @@ model Store {
   is_flex_price  Boolean @default(false)
   is_float_price Boolean @default(false)
   poin_config    Int     @default(0)
+  tax_percentage    Decimal @db.Decimal @default(11)
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]
@@ -274,7 +275,7 @@ model TransactionProduct {
   weight           Decimal @db.Decimal
   price            Decimal @db.Decimal
   adjustment_price Decimal @db.Decimal
-  discount         Decimal @db.Decimal
+  discount         Decimal @db.Decimal @default(0)
   total_price      Decimal @db.Decimal
   status           Int // 0: Available, 1: Sold Out, 2: Taken
   comment          String? @db.Text

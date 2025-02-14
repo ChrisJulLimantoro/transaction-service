@@ -53,8 +53,61 @@ export class TransactionController {
     return response;
   }
 
-  // Marketplace Endpoint
+  @MessagePattern({ cmd: 'post:transaction-detail' })
+  @Describe({
+    description: 'Create Transaction Detail',
+    fe: ['transaction/sales:edit'],
+  })
+  async createTransactionDetail(@Payload() data: any) {
+    const response = await this.transactionService.createDetail(data.body);
+    return response;
+  }
 
+  @MessagePattern({ cmd: 'put:transaction/*' })
+  @Describe({
+    description: 'Update Transaction',
+    fe: ['transaction/sales:edit'],
+  })
+  async updateTransaction(@Payload() data: any) {
+    const id = data.params.id;
+    const body = data.body;
+    return await this.transactionService.update(id, body);
+  }
+
+  @MessagePattern({ cmd: 'put:transaction-detail/*' })
+  @Describe({
+    description: 'Update Transaction Detail',
+    fe: ['transaction/sales:edit'],
+  })
+  async updateTransactionDetail(@Payload() data: any) {
+    console.log(data);
+    const id = data.params.id;
+    const body = data.body;
+    console.log(body.transaction_details);
+    return await this.transactionService.updateDetail(id, body);
+  }
+
+  @MessagePattern({ cmd: 'delete:transaction/*' })
+  @Describe({
+    description: 'Delete Transaction',
+    fe: ['transaction/sales:delete'],
+  })
+  async deleteTransaction(@Payload() data: any) {
+    const id = data.params.id;
+    return await this.transactionService.delete(id);
+  }
+
+  @MessagePattern({ cmd: 'delete:transaction-detail/*' })
+  @Describe({
+    description: 'Delete Transaction Detail',
+    fe: ['transaction/sales:edit'],
+  })
+  async deleteTransactionDetail(@Payload() data: any) {
+    const id = data.params.id;
+    return await this.transactionService.deleteDetail(id);
+  }
+
+  // Marketplace Endpoint
   @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
   @Exempt()
   async handleNotification(@Payload() query: any): Promise<any> {
