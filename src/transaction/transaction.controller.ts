@@ -66,6 +66,9 @@ export class TransactionController {
   })
   async createTransactionDetail(@Payload() data: any) {
     const response = await this.transactionService.createDetail(data.body);
+    if (response) {
+      this.marketplaceClient.emit('transaction_product_created', response.data);
+    }
     return response;
   }
 
