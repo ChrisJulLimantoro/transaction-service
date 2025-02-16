@@ -54,6 +54,7 @@ export class TransactionController {
     console.log('this is reponse format', response);
     if (response.success) {
       this.financeClient.emit('transaction_created', response);
+      this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
   }
@@ -76,6 +77,13 @@ export class TransactionController {
   async updateTransaction(@Payload() data: any) {
     const id = data.params.id;
     const body = data.body;
+    const response = await this.transactionService.update(id, body);
+    if (response) {
+      this.marketplaceClient.emit(
+        'transaction_operational_updated',
+        response.data,
+      );
+    }
     return await this.transactionService.update(id, body);
   }
 
@@ -285,7 +293,7 @@ export class TransactionController {
             product_code: { connect: { id: String(item.id) } },
             transaction_type: 1,
             price: Number(item.price_per_gram),
-            adjustment_price: Number(item.price_per_gram),
+            adjustment_price: 0,
             weight: Number(item.weight || 0),
             discount: Number(item.discount || 0),
             total_price: Number(item.price) * Number(item.quantity),
