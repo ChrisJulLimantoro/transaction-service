@@ -240,6 +240,7 @@ export class TransactionService extends BaseService {
 
   async deleteDetail(id: string): Promise<CustomResponse> {
     const product = await this.transactionProductRepository.findOne(id);
+    console.log(id);
     const operation = await this.transactionOperationRepository.findOne(id);
 
     if (!product && !operation) {
@@ -268,13 +269,13 @@ export class TransactionService extends BaseService {
       await this.transactionOperationRepository.delete(id);
     }
 
-    await this.syncDetail(
+    const updated = await this.syncDetail(
       product ? product.transaction_id : operation.transaction_id,
     );
 
     return CustomResponse.success(
       'Transaction Detail deleted successfully',
-      null,
+      updated,
     );
   }
 
@@ -316,7 +317,7 @@ export class TransactionService extends BaseService {
       transaction_id,
       updateData,
     );
-    return updateData;
+    return res;
   }
 
   async delete(id: string): Promise<CustomResponse> {
