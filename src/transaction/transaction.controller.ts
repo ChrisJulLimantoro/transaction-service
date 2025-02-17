@@ -54,6 +54,7 @@ export class TransactionController {
     console.log('this is reponse format', response);
     if (response.success) {
       this.financeClient.emit('transaction_created', response);
+      this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
   }
@@ -65,6 +66,9 @@ export class TransactionController {
   })
   async createTransactionDetail(@Payload() data: any) {
     const response = await this.transactionService.createDetail(data.body);
+    if (response) {
+      this.marketplaceClient.emit('transaction_product_created', response.data);
+    }
     return response;
   }
 
@@ -76,6 +80,13 @@ export class TransactionController {
   async updateTransaction(@Payload() data: any) {
     const id = data.params.id;
     const body = data.body;
+    const response = await this.transactionService.update(id, body);
+    if (response) {
+      this.marketplaceClient.emit(
+        'transaction_operational_updated',
+        response.data,
+      );
+    }
     return await this.transactionService.update(id, body);
   }
 
@@ -97,7 +108,11 @@ export class TransactionController {
   })
   async deleteTransaction(@Payload() data: any) {
     const id = data.params.id;
-    return await this.transactionService.delete(id);
+    const response = await this.transactionService.delete(id);
+    if (response) {
+      this.marketplaceClient.emit('transaction_deleted', { id: id });
+    }
+    return response;
   }
 
   @MessagePattern({ cmd: 'delete:transaction-detail/*' })
@@ -107,7 +122,14 @@ export class TransactionController {
   })
   async deleteTransactionDetail(@Payload() data: any) {
     const id = data.params.id;
-    return await this.transactionService.deleteDetail(id);
+    const response = await this.transactionService.deleteDetail(id);
+    if (response) {
+      this.marketplaceClient.emit('transaction_detail_deleted', {
+        id: id,
+        data: response.data,
+      });
+    }
+    return response;
   }
 
   // Marketplace Endpoint
@@ -138,7 +160,7 @@ export class TransactionController {
         if (transaction.status != 1) {
           await this.prisma.transaction.update({
             where: { id: order_id },
-            data: { status: 1 },
+            data: { status: 1, paid_amount: totalPrice },
           });
           await this.prisma.store.update({
             where: { id: storeId },
@@ -285,7 +307,7 @@ export class TransactionController {
             product_code: { connect: { id: String(item.id) } },
             transaction_type: 1,
             price: Number(item.price_per_gram),
-            adjustment_price: Number(item.price_per_gram),
+            adjustment_price: 0,
             weight: Number(item.weight || 0),
             discount: Number(item.discount || 0),
             total_price: Number(item.price) * Number(item.quantity),

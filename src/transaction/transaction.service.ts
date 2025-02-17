@@ -241,6 +241,7 @@ export class TransactionService extends BaseService {
 
   async deleteDetail(id: string): Promise<CustomResponse> {
     const product = await this.transactionProductRepository.findOne(id);
+    console.log(id);
     const operation = await this.transactionOperationRepository.findOne(id);
 
     if (!product && !operation) {
@@ -269,13 +270,13 @@ export class TransactionService extends BaseService {
       await this.transactionOperationRepository.delete(id);
     }
 
-    await this.syncDetail(
+    const updated = await this.syncDetail(
       product ? product.transaction_id : operation.transaction_id,
     );
 
     return CustomResponse.success(
       'Transaction Detail deleted successfully',
-      null,
+      updated,
     );
   }
 
@@ -317,7 +318,7 @@ export class TransactionService extends BaseService {
       transaction_id,
       updateData,
     );
-    return updateData;
+    return res;
   }
 
   async delete(id: string): Promise<CustomResponse> {
@@ -358,9 +359,12 @@ export class TransactionService extends BaseService {
       for (const detail of transactionOperation) {
         await this.transactionOperationRepository.delete(detail.id);
       }
-
-      await this.repository.delete(id);
-      return CustomResponse.success('Transaction deleted successfully', null);
+      const dataDeleted = await this.repository.delete(id);
+      console.log('Transaction Deleted!');
+      return CustomResponse.success(
+        'Transaction deleted successfully',
+        dataDeleted,
+      );
     } catch (error) {
       return CustomResponse.error('Failed to delete transaction', null, 500);
     }
