@@ -357,9 +357,12 @@ export class TransactionService extends BaseService {
       for (const detail of transactionOperation) {
         await this.transactionOperationRepository.delete(detail.id);
       }
-
-      await this.repository.delete(id);
-      return CustomResponse.success('Transaction deleted successfully', null);
+      const dataDeleted = await this.repository.delete(id);
+      console.log('Transaction Deleted!');
+      return CustomResponse.success(
+        'Transaction deleted successfully',
+        dataDeleted,
+      );
     } catch (error) {
       return CustomResponse.error('Failed to delete transaction', null, 500);
     }

@@ -108,7 +108,11 @@ export class TransactionController {
   })
   async deleteTransaction(@Payload() data: any) {
     const id = data.params.id;
-    return await this.transactionService.delete(id);
+    const response = await this.transactionService.delete(id);
+    if (response) {
+      this.marketplaceClient.emit('transaction_deleted', { id: id });
+    }
+    return response;
   }
 
   @MessagePattern({ cmd: 'delete:transaction-detail/*' })
