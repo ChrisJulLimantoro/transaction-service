@@ -203,8 +203,9 @@ export class TransactionService extends BaseService {
   }
 
   async updateDetail(id: string, data: any): Promise<CustomResponse> {
-    data.unit = data.quantity;
-    if (data.type == 'Operation') {
+    data.unit = data.quantity; // for now assume unit is same as quantity [for Operation]
+    data.weight = data.quantity; // for now assume weight is same as quantity [for product]
+    if (data.detail_type == 'operation') {
       const transactionDetail =
         await this.transactionOperationRepository.findOne(id);
       if (!transactionDetail) {
