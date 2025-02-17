@@ -160,7 +160,7 @@ export class TransactionController {
         if (transaction.status != 1) {
           await this.prisma.transaction.update({
             where: { id: order_id },
-            data: { status: 1 },
+            data: { status: 1, paid_amount: totalPrice },
           });
           await this.prisma.store.update({
             where: { id: storeId },
