@@ -11,7 +11,11 @@ export class TransactionOperationRepository extends BaseRepository<any> {
           store: true,
         },
       },
-      operation: true,
+      operation: {
+        include: {
+          account: true
+        }
+      },
     };
     super(prisma, 'transactionOperation', relations, true);
   }

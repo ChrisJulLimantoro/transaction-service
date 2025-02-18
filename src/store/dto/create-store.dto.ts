@@ -14,6 +14,7 @@ export class CreateStoreRequest {
     id,
     code,
     name,
+    company_id,
     is_active,
     is_flex_price,
     is_float_price,
@@ -28,6 +29,7 @@ export class CreateStoreRequest {
     this.is_float_price = is_float_price;
     this.poin_config = parseFloat(poin_config);
     this.tax_percentage = parseFloat(tax_percentage);
+    this.company_id = company_id;
   }
 
   static schema() {

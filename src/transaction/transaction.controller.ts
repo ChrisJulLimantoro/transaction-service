@@ -53,7 +53,7 @@ export class TransactionController {
     const response = await this.transactionService.create(data.body);
     console.log('this is reponse format', response);
     if (response.success) {
-      this.financeClient.emit('transaction_created', response);
+      this.financeClient.emit({ cmd:'transaction_created'}, response);
       this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
