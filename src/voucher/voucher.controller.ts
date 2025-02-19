@@ -25,7 +25,9 @@ export class VoucherController {
   })
   async getByStore(@Payload() data: any): Promise<any> {
     try {
-      const result = await this.voucherService.getByStore(data.params.store_id);
+      const result = await this.voucherService.getByStore(
+        data.body.auth.store_id,
+      );
       return {
         success: true,
         message: 'Success Retrieve Vouchers!',
