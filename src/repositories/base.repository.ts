@@ -15,6 +15,7 @@ export class BaseRepository<T> {
   async create(data: any): Promise<T> {
     return this.prisma[this.modelName].create({
       data,
+      include: this.relations,
     });
   }
 
