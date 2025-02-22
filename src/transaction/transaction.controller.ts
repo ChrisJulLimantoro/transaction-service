@@ -13,6 +13,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { channel } from 'diagnostics_channel';
 import { Describe } from 'src/decorator/describe.decorator';
 import { Exempt } from 'src/decorator/exempt.decorator';
+import { CustomResponse } from 'src/exception/dto/custom-response.dto';
 
 @Controller('transaction')
 export class TransactionController {
@@ -51,9 +52,7 @@ export class TransactionController {
   })
   async createTransaction(@Payload() data: any) {
     const response = await this.transactionService.create(data.body);
-    console.log('this is reponse format', response);
     if (response.success) {
-      this.financeClient.emit({ cmd:'transaction_created'}, response);
       this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
@@ -130,6 +129,63 @@ export class TransactionController {
       });
     }
     return response;
+  }
+
+  @MessagePattern({ cmd: 'put:transaction-approve/*' })
+  @Describe({
+    description: 'Transaction Approve',
+    fe: [
+      'transaction/sales:approve',
+    ]
+  })
+  async transactionApprove(@Payload() data: any) {
+    var newdata = data.body;
+    const params = data.params;
+    var newstatus = newdata.approve;
+    
+    // Validation
+    if (!Number.isInteger(newstatus) || newstatus < 0 || newstatus > 2) {
+      return CustomResponse.error('Status not valid!', 
+        [{
+          message: 'Status not valid!',
+          field: 'approve',
+          code: 'not_valid',
+        }], 400);
+    }
+    const res = await this.transactionService.updateStatus(params.id, newstatus);
+    if (res.success) {
+      this.financeClient.emit({ cmd:'sales_approved'}, res);
+    }
+    return res;
+  }
+
+  @MessagePattern({ cmd: 'put:transaction-disapprove/*' })
+  @Describe({
+    description: 'Transaction Disapprove',
+    fe: [
+      'transaction/sales:disapprove',
+    ]
+  })
+  async transactionDisapprove(@Payload() data: any) {
+    var newdata = data.body;
+    const params = data.params;
+    var newstatus = newdata.approve;
+    
+    // Validation
+    if (!Number.isInteger(newstatus) || newstatus < 0 || newstatus > 2) {
+      return CustomResponse.error('Status not valid!', 
+        [{
+          message: 'Status not valid!',
+          field: 'approve',
+          code: 'not_valid',
+        }], 400);
+    }
+
+    const res = await this.transactionService.updateStatus(params.id, newstatus);
+    if (res.success) {
+      this.financeClient.emit({ cmd:'sales_disapproved'}, res);
+    }
+    return res;
   }
 
   // Marketplace Endpoint

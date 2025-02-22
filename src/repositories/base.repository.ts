@@ -51,6 +51,7 @@ export class BaseRepository<T> {
     return this.prisma[this.modelName].update({
       where: this.isSoftDelete ? { id, deleted_at: null } : { id },
       data,
+      include: this.relations,
     });
   }
 

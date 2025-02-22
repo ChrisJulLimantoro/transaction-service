@@ -345,6 +345,8 @@ model Transaction {
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
+  approve Int @default(0) // 0 = draft, 1 = approve, 0 = dissaprove
+  approve_by String? @db.Uuid
 
   @@index([deleted_at])
   @@map("transactions")

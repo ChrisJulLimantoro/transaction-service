@@ -371,6 +371,15 @@ export class TransactionService extends BaseService {
     }
   }
 
+  async updateStatus(id: string, status: number): Promise<CustomResponse> {
+    const transaction = await this.repository.findOne(id);
+    if (!transaction) {
+      return CustomResponse.error('Transaction not found', null, 404);
+    }
+    const res = await this.repository.update(id, { approve: status });
+    return CustomResponse.success('Transaction status updated successfully', res);
+  }
+
   // MarketPlace Transaction
   private readonly midtransUrl =
     'https://app.sandbox.midtrans.com/snap/v1/transactions';
