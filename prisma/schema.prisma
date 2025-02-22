@@ -69,12 +69,13 @@ model Product {
 }
 
 model ProductCode {
-  id          String  @id @default(uuid()) @db.Uuid
-  barcode     String
-  product_id  String  @db.Uuid
-  weight      Decimal @db.Decimal
-  fixed_price Decimal @db.Decimal
-  status      Int // 0: Available 1: Sold Out 2: Taken
+  id            String  @id @default(uuid()) @db.Uuid
+  barcode       String
+  product_id    String  @db.Uuid
+  weight        Decimal @db.Decimal
+  fixed_price    Decimal @db.Decimal
+  status        Int // 0: Available 1: Sold Out 2: Taken
+  taken_out_at  DateTime?
 
   product              Product              @relation(fields: [product_id], references: [id])
   transaction_products TransactionProduct[]

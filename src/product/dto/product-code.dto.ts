@@ -7,14 +7,24 @@ export class ProductCodeDto {
   status: number;
   weight: number;
   fixed_price: number;
+  taken_out_at: Date;
 
-  constructor({ id, barcode, product_id, status, weight, fixed_price }) {
+  constructor({
+    id,
+    barcode,
+    product_id,
+    status,
+    weight,
+    fixed_price,
+    taken_out_at,
+  }) {
     this.id = id;
     this.barcode = barcode;
     this.product_id = product_id;
-    this.status = status;
+    this.status = parseInt(status);
     this.weight = parseFloat(weight);
     this.fixed_price = parseFloat(fixed_price);
+    this.taken_out_at = taken_out_at ? new Date(taken_out_at) : null;
   }
 
   static schema() {
@@ -25,6 +35,7 @@ export class ProductCodeDto {
       status: z.number().optional(),
       weight: z.number().optional(),
       fixed_price: z.number().optional(),
+      taken_out_at: z.date().nullable().optional(),
     });
   }
 }
