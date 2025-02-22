@@ -5,6 +5,7 @@ import { VoucherRequest } from './voucher.model';
 import { VoucherValidation } from './voucher.validation';
 import { Decimal } from '@prisma/client/runtime/library';
 import { RpcException } from '@nestjs/microservices';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class VoucherService {
@@ -31,11 +32,19 @@ export class VoucherService {
     console.log(request);
     VoucherValidation.CREATE.parse(request);
 
+    const randomNumber = randomInt(100000, 999999); // 6 digit angka acak
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const storeCode = request.store_id
+      ? `STR-${request.store_id.slice(-3)}`
+      : 'STR-000'; // Ambil 3 karakter terakhir dari store_id
+
+    const uniqueCode = `VOUCH-${randomNumber}-${datePart}-${storeCode}`;
+
     // Create a voucher in the database
     const createdVoucher = await this.prisma.voucher.create({
       data: {
         name: request.voucher_name,
-        code: 'codetes',
+        code: uniqueCode,
         discount_amount: new Decimal(request.discount_amount),
         max_discount: new Decimal(request.max_discount),
         min_purchase: new Decimal(request.minimum_purchase),
@@ -98,7 +107,6 @@ export class VoucherService {
       where: { id: voucher_id },
       data: {
         name: request.voucher_name,
-        code: 'codetes',
         discount_amount: new Decimal(request.discount_amount),
         max_discount: new Decimal(request.max_discount),
         min_purchase: new Decimal(request.minimum_purchase),

@@ -112,6 +112,7 @@ export class TransactionService extends BaseService {
       if (newdetail.success) transDetails.push(newdetail.data);
     }
 
+    data = transaction;
     data.transaction_details = transDetails;
     return CustomResponse.success('Transaction created successfully', data);
   }
