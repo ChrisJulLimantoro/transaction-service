@@ -39,4 +39,14 @@ export class ProductService extends BaseService {
     const code = await this.productCodeRepository.create(validatedData);
     return CustomResponse.success('Product code generated!', code, 201);
   }
+
+  async updateProductCode(id: any, data: any) {
+    const convert = new ProductCodeDto(data);
+    const validatedData = this.validation.validate(
+      convert,
+      ProductCodeDto.schema(),
+    );
+    const code = await this.productCodeRepository.update(id, validatedData);
+    return CustomResponse.success('Product code updated!', code, 200);
+  }
 }

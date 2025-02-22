@@ -65,4 +65,14 @@ export class ProductController {
       'Error processing product_code_generated event',
     );
   }
+
+  @EventPattern({ cmd: 'product_code_updated' })
+  @Exempt()
+  async productCodeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.handleEvent(
+      context,
+      () => this.service.updateProductCode(data.id, data),
+      'Error processing product_code_updated event',
+    );
+  }
 }
