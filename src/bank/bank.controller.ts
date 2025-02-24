@@ -14,9 +14,11 @@ export class BankController {
   })
   async getByStore(@Payload() data: any): Promise<any> {
     try {
+      console.log(data);
       const result = await this.bankAccountService.getByStore(
-        data.params.store_id,
+        data.body.auth.store_id,
       );
+      console.log(result);
       return {
         success: true,
         message: 'Success Retrieve Bank Accounts!',
