@@ -23,6 +23,7 @@ export class TransactionController {
     @Inject('MARKETPLACE')
     private readonly marketplaceClient: ClientProxy,
     @Inject('FINANCE') private readonly financeClient: ClientProxy,
+    @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
   ) {}
 
   @MessagePattern({ cmd: 'get:transaction' })
@@ -217,6 +218,7 @@ export class TransactionController {
         include: {
           customer: true,
           store: true,
+          transaction_products: true,
         },
       });
 
@@ -390,6 +392,13 @@ export class TransactionController {
           where: { id: item.id },
           data: { status: 1 },
         });
+        this.inventoryClient.emit(
+          { cmd: 'product_code_updated' },
+          {
+            id: item.id,
+            status: 1,
+          },
+        );
       }
 
       // 🔍 **Ambil Data Lengkap Transaksi Setelah Disimpan**
