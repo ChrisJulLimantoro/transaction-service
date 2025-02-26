@@ -1,7 +1,14 @@
 import { Controller } from '@nestjs/common';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import {
+  Ctx,
+  EventPattern,
+  MessagePattern,
+  Payload,
+  RmqContext,
+} from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { StoreService } from './store.service';
+import { Describe } from 'src/decorator/describe.decorator';
 
 @Controller('store')
 export class StoreController {
@@ -24,6 +31,16 @@ export class StoreController {
       console.error(errorMessage, error.stack);
       channel.nack(originalMsg);
     }
+  }
+
+  @MessagePattern({ cmd: 'get:store/*' })
+  @Describe({
+    description: 'Get Store By ID',
+    fe: ['marketplace/balance:open'],
+  })
+  async getStore(@Payload() data: any): Promise<any> {
+    const id = data.params.id;
+    return await this.service.findOne(id);
   }
 
   @EventPattern({ cmd: 'store_created' })

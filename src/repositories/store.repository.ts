@@ -7,6 +7,17 @@ export class StoreRepository extends BaseRepository<any> {
   constructor(prisma: PrismaService) {
     const relations = {
       company: true,
+      PayoutRequest: {
+        orderBy: {
+          created_at: 'desc',
+        },
+      },
+      BalanceLog: {
+        orderBy: {
+          created_at: 'desc',
+        },
+      },
+      BankAccount: true,
       products: {
         where: {
           deleted_at: null,

@@ -14,7 +14,11 @@ export class TransactionRepository extends BaseRepository<any> {
           deleted_at: null,
         },
         include: {
-          operation: true,
+          operation: {
+            include: {
+              account: true,
+            }
+          },
         },
       },
       transaction_products: {
@@ -22,7 +26,19 @@ export class TransactionRepository extends BaseRepository<any> {
           deleted_at: null,
         },
         include: {
-          product_code: true,
+          product_code: {
+            include: {
+              product: {
+                include: {
+                  type: {
+                    include: {
+                      category: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           TransactionReview: true,
         },
       },
