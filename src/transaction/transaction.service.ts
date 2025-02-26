@@ -206,6 +206,8 @@ export class TransactionService extends BaseService {
   async updateDetail(id: string, data: any): Promise<CustomResponse> {
     data.unit = data.quantity; // for now assume unit is same as quantity [for Operation]
     data.weight = data.quantity; // for now assume weight is same as quantity [for product]
+
+    let updatedDetail;
     if (data.detail_type == 'operation') {
       const transactionDetail =
         await this.transactionOperationRepository.findOne(id);
@@ -218,6 +220,7 @@ export class TransactionService extends BaseService {
         CreateTransactionOperationRequest.schema(),
       );
       await this.transactionOperationRepository.update(id, validatedData);
+      updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
       const transactionDetail =
         await this.transactionProductRepository.findOne(id);
@@ -230,14 +233,15 @@ export class TransactionService extends BaseService {
         CreateTransactionProductRequest.schema(),
       );
       await this.transactionProductRepository.update(id, validatedData);
+      updatedDetail = await this.transactionProductRepository.findOne(id); // Fetch updated data
     }
 
-    await this.syncDetail(data.transaction_id);
+    const syncResult = await this.syncDetail(data.transaction_id); // Get sync detail result
 
-    return CustomResponse.success(
-      'Transaction Detail updated successfully',
-      null,
-    );
+    return CustomResponse.success('Transaction Detail updated successfully', {
+      updatedDetail,
+      syncResult,
+    });
   }
 
   async deleteDetail(id: string): Promise<CustomResponse> {
@@ -377,7 +381,10 @@ export class TransactionService extends BaseService {
       return CustomResponse.error('Transaction not found', null, 404);
     }
     const res = await this.repository.update(id, { approve: status });
-    return CustomResponse.success('Transaction status updated successfully', res);
+    return CustomResponse.success(
+      'Transaction status updated successfully',
+      res,
+    );
   }
 
   // MarketPlace Transaction
