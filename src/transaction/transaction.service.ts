@@ -451,7 +451,6 @@ export class TransactionService extends BaseService {
     try {
       console.log('Processing transaction:', data);
 
-      // 🔍 Validasi input
       if (
         !data.orderId ||
         !data.grossAmount ||
@@ -466,20 +465,16 @@ export class TransactionService extends BaseService {
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
-
-      // 🔍 Validasi bahwa total harga item sebelum diskon cocok dengan `grossAmount`
       if (totalItemPrice !== data.grossAmount) {
         throw new Error(
           `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
 
-      // 🕒 Hitung batas expired 1 jam dari sekarang (timezone Jakarta +7)
       const now = new Date();
       now.setHours(now.getHours() + 7);
       const expiredAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      // 🗓️ Format waktu mulai untuk Midtrans
       const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
         .getDate()
         .toString()
@@ -491,16 +486,18 @@ export class TransactionService extends BaseService {
           '0',
         )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      // 🔗 Request payment link dari Midtrans
       const paymentLink = await this.requestPaymentLink(
         data,
         formattedStartTime,
       );
 
-      // 💰 Hitung sub total tanpa diskon & format kode transaksi
-      const subTotalPrice = data.items
-        .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
-        .reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const filteredItems = data.items.filter(
+        (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+      ); // Exclude discount
+      const subTotalPrice = filteredItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
 
       const store = await this.prisma.store.findUnique({
         where: { id: String(data.storeId) },
@@ -516,22 +513,77 @@ export class TransactionService extends BaseService {
         .toString()
         .padStart(3, '0')}`;
 
-      // 📝 Simpan transaksi ke database
-      const transaction = await this.createTransactionRecord(
-        data,
-        paymentLink,
-        subTotalPrice,
-        code,
-        expiredAt,
-      );
+      // 🔥 **Gunakan PrismaService yang sudah diinject**
+      const result = await this.prisma.$transaction(async (tx) => {
+        // **1. Insert Transaksi**
+        const transaction = await tx.transaction.create({
+          data: {
+            id: String(data.orderId),
+            date: new Date(),
+            code,
+            transaction_type: 1,
+            payment_method: 5,
+            status: 0,
+            sub_total_price: subTotalPrice,
+            total_price: data.grossAmount,
+            tax_price: data.taxAmount,
+            payment_link: paymentLink,
+            expired_at: expiredAt,
+            store: { connect: { id: String(data.storeId) } },
+            customer: { connect: { id: String(data.customerId) } },
+            voucher_used: data.voucherOwnedId
+              ? { connect: { id: String(data.voucherOwnedId) } }
+              : undefined,
+          },
+        });
 
-      await this.createTransactionProducts(transaction.id, data.items);
-      await this.updateVoucherIfUsed(data.voucherOwnedId);
+        // **2. Insert Produk**
+        const transactionProducts = data.items
+          .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
+          .map((item) => ({
+            transaction_id: transaction.id,
+            product_code_id: item.id,
+            name: item.name,
+            price: Number(item.price),
+            total_price: Number(item.price) * Number(item.quantity),
+            transaction_type: 1,
+            weight: Number(item.weight || 0),
+            adjustment_price: Number(item.adjustment_price || 0),
+            status: 1,
+          }));
 
-      // 🔍 Ambil data transaksi lengkap
-      const fullTransaction = await this.getFullTransactionDetails(
-        transaction.id,
-      );
+        await tx.transactionProduct.createMany({ data: transactionProducts });
+
+        // **3. Update Status Produk**
+        for (const item of data.items.filter(
+          (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+        )) {
+          await tx.productCode.update({
+            where: { id: item.id },
+            data: { status: 1 },
+          });
+          this.inventoryClient.emit(
+            { cmd: 'product_code_updated' },
+            {
+              id: item.id,
+              status: 1,
+            },
+          );
+        }
+
+        // **4. Update Voucher Jika Digunakan**
+        if (data.voucherOwnedId) {
+          await tx.voucherOwned.update({
+            where: { id: data.voucherOwnedId },
+            data: { is_used: true },
+          });
+        }
+
+        return transaction;
+      });
+
+      // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
+      const fullTransaction = await this.getFullTransactionDetails(result.id);
 
       // 📡 Emit event ke Marketplace
       this.marketplaceClient.emit('transaction_created', {
@@ -549,13 +601,13 @@ export class TransactionService extends BaseService {
         data: {
           paymentLink,
           expiredAt,
-          discountAmount: subTotalPrice - data.grossAmount,
+          discountAmount: totalItemPrice - data.grossAmount,
           taxAmount: data.taxAmount,
         },
       };
     } catch (error) {
       context.getChannelRef().nack(context.getMessage());
-      console.error('Error processing transaction:', error.message);
+      console.error('❌ Error processing transaction:', error.message);
       return {
         success: false,
         message: error.message || 'Failed to process transaction',
@@ -606,9 +658,6 @@ export class TransactionService extends BaseService {
             start_time: formattedStartTime,
             unit: 'minute',
             duration: 60,
-          },
-          callbacks: {
-            finish: `https://your-domain.com/payment/callback?order_id=${data.orderId}`,
           },
           custom_field1: `Store: ${data.storeId}`,
           custom_field2: `Customer: ${data.customerDetails.email}`,
@@ -701,9 +750,19 @@ export class TransactionService extends BaseService {
   }
 
   private async getFullTransactionDetails(transactionId: string) {
-    return this.prisma.transaction.findUnique({
-      where: { id: transactionId },
-      include: { store: true, customer: true },
+    const fullTransaction = await this.prisma.transaction.findUnique({
+      where: { id: String(transactionId) },
+      include: {
+        store: true,
+        customer: true,
+        voucher_used: true,
+        transaction_products: {
+          include: {
+            product_code: true,
+          },
+        },
+      },
     });
+    return fullTransaction;
   }
 }
