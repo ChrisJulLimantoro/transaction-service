@@ -538,25 +538,54 @@ export class TransactionService extends BaseService {
         });
 
         // **2. Insert Produk**
-        const transactionProducts = data.items
-          .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
-          .map((item) => {
-            const weight = Number(item.weight || 1); // Default 1 untuk menghindari division by zero
-            const pricePerUnit = Number(item.price) / weight; // Harga per unit (per gram atau kg)
+        const transactionProducts = await Promise.all(
+          data.items
+            .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
+            .map(async (item) => {
+              const productCode = await tx.productCode.findUnique({
+                where: { id: item.id },
+                include: {
+                  product: {
+                    include: {
+                      type: {
+                        include: {
+                          category: {
+                            select: { name: true, code: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              });
 
-            return {
-              transaction_id: transaction.id,
-              product_code_id: item.id,
-              name: item.name,
-              price: pricePerUnit, // Menggunakan harga per unit
-              total_price: Number(item.price) * Number(item.quantity),
-              transaction_type: 1,
-              weight: weight,
-              adjustment_price: Number(item.adjustment_price || 0),
-              status: 1,
-            };
-          });
+              if (!productCode) {
+                throw new Error(`Product code not found for ID: ${item.id}`);
+              }
 
+              // **Format Name & Type**
+              const productName = `${productCode.barcode} - ${productCode.product.name}`;
+              const productType = `${productCode.product.type.code} - ${productCode.product.type.category.name}`;
+
+              const weight = Number(item.weight || 1);
+              const pricePerUnit = Number(item.price) / weight;
+
+              return {
+                transaction_id: transaction.id,
+                product_code_id: item.id,
+                name: productName,
+                type: productType,
+                price: pricePerUnit, // Harga per unit
+                total_price: Number(item.price) * Number(item.quantity),
+                transaction_type: 1,
+                weight: weight,
+                adjustment_price: Number(item.adjustment_price || 0),
+                status: 1,
+              };
+            }),
+        );
+
+        // **Insert Semua Produk dalam Batch**
         await tx.transactionProduct.createMany({ data: transactionProducts });
 
         // **3. Update Status Produk**
