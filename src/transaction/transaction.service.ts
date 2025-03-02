@@ -540,17 +540,22 @@ export class TransactionService extends BaseService {
         // **2. Insert Produk**
         const transactionProducts = data.items
           .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
-          .map((item) => ({
-            transaction_id: transaction.id,
-            product_code_id: item.id,
-            name: item.name,
-            price: Number(item.price),
-            total_price: Number(item.price) * Number(item.quantity),
-            transaction_type: 1,
-            weight: Number(item.weight || 0),
-            adjustment_price: Number(item.adjustment_price || 0),
-            status: 1,
-          }));
+          .map((item) => {
+            const weight = Number(item.weight || 1); // Default 1 untuk menghindari division by zero
+            const pricePerUnit = Number(item.price) / weight; // Harga per unit (per gram atau kg)
+
+            return {
+              transaction_id: transaction.id,
+              product_code_id: item.id,
+              name: item.name,
+              price: pricePerUnit, // Menggunakan harga per unit
+              total_price: Number(item.price) * Number(item.quantity),
+              transaction_type: 1,
+              weight: weight,
+              adjustment_price: Number(item.adjustment_price || 0),
+              status: 1,
+            };
+          });
 
         await tx.transactionProduct.createMany({ data: transactionProducts });
 
