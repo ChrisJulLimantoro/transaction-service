@@ -13,7 +13,7 @@ import { TransactionProductRepository } from 'src/repositories/transaction-produ
 import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RmqContext } from '@nestjs/microservices';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -29,6 +29,7 @@ export class TransactionService extends BaseService {
     protected readonly validation: ValidationService,
     private readonly prisma: PrismaService,
     @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
+    @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
   ) {
     super(validation);
   }
@@ -388,112 +389,321 @@ export class TransactionService extends BaseService {
   }
 
   // MarketPlace Transaction
-  private readonly midtransUrl =
-    'https://app.sandbox.midtrans.com/snap/v1/transactions';
-  private readonly midtransServerKey =
-    'U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=';
-
-  async processTransactionMarketplace(data: {
-    orderId: string;
-    grossAmount: number;
-    items: any[];
-    customerDetails: any;
-    taxAmount: number; // Receive taxAmount separately from frontend
-  }): Promise<string> {
+  async processMidtransNotification(query: any): Promise<any> {
     try {
-      const orderId = data.orderId;
+      console.log('Notification received from Midtrans:', query);
+      const { transaction_status, order_id } = query;
 
-      // Calculate total item price before discount (gross amount)
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: order_id },
+        include: { store: true },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found:', order_id);
+        return { success: false, message: 'Transaction not found' };
+      }
+
+      if (transaction_status === 'settlement' && transaction.status !== 1) {
+        await this.prisma.transaction.update({
+          where: { id: order_id },
+          data: { status: 1, paid_amount: transaction.total_price },
+        });
+
+        await this.prisma.store.update({
+          where: { id: transaction.store_id },
+          data: { balance: { increment: transaction.total_price } },
+        });
+
+        await this.prisma.balanceLog.create({
+          data: {
+            store_id: transaction.store_id,
+            amount: transaction.total_price,
+            type: 'INCOME',
+            information: `Pemasukan dari transaksi #${transaction.code}`,
+          },
+        });
+
+        this.marketplaceClient.emit('transaction_settlement', {
+          id: transaction.id,
+        });
+
+        return {
+          success: true,
+          redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Transaction is not in settlement status',
+      };
+    } catch (error) {
+      console.error('Error processing transaction:', error.message);
+      return {
+        success: false,
+        message: error.message || 'Failed to process transaction',
+      };
+    }
+  }
+
+  async processMarketplaceTransaction(data: any, context: RmqContext) {
+    try {
+      console.log('Processing transaction:', data);
+
+      // 🔍 Validasi input
+      if (
+        !data.orderId ||
+        !data.grossAmount ||
+        !data.items ||
+        !data.customerDetails ||
+        !data.taxAmount
+      ) {
+        throw new Error('Missing required transaction details');
+      }
+
       const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
 
-      // Validate that grossAmount matches total item price (before discount)
+      // 🔍 Validasi bahwa total harga item sebelum diskon cocok dengan `grossAmount`
       if (totalItemPrice !== data.grossAmount) {
         throw new Error(
           `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
 
-      // Ensure timezone is in Jakarta (GMT+7)
+      // 🕒 Hitung batas expired 1 jam dari sekarang (timezone Jakarta +7)
       const now = new Date();
-      now.setHours(now.getHours() + 7); // Set timezone to WIB (+7)
+      now.setHours(now.getHours() + 7);
+      const expiredAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      const expiredTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+      // 🗓️ Format waktu mulai untuk Midtrans
+      const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
+        .getDate()
+        .toString()
+        .padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(
+          2,
+          '0',
+        )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      // Format `start_time` to be compatible with Midtrans (YYYY-MM-DD HH:MM:SS +0700)
-      const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now
-        .getHours()
-        .toString()
-        .padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now
-        .getSeconds()
-        .toString()
-        .padStart(2, '0')} +0700`;
+      // 🔗 Request payment link dari Midtrans
+      const paymentLink = await this.requestPaymentLink(
+        data,
+        formattedStartTime,
+      );
 
-      // Format customer details
-      const customerDetails = {
-        first_name: data.customerDetails.first_name || '',
-        last_name: data.customerDetails.last_name || '',
-        email: data.customerDetails.email || '',
-        phone: data.customerDetails.phone || '',
-        billing_address: {
-          address: data.customerDetails.billing_address?.address || 'Unknown',
-          city: data.customerDetails.billing_address?.city || 'Unknown',
-          postal_code:
-            data.customerDetails.billing_address?.postal_code || '00000',
-          country_code: 'IDN',
-        },
-        shipping_address: {
-          address: data.customerDetails.shipping_address?.address || 'Unknown',
-          city: data.customerDetails.shipping_address?.city || 'Unknown',
-          postal_code:
-            data.customerDetails.shipping_address?.postal_code || '00000',
-          country_code: 'IDN',
+      // 💰 Hitung sub total tanpa diskon & format kode transaksi
+      const subTotalPrice = data.items
+        .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
+        .reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const store = await this.prisma.store.findUnique({
+        where: { id: String(data.storeId) },
+        select: { code: true },
+      });
+      const count = await this.prisma.transaction.count({
+        where: { store_id: String(data.storeId) },
+      });
+
+      const code = `SAL/${store?.code}/${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}/${(
+        count + 1
+      )
+        .toString()
+        .padStart(3, '0')}`;
+
+      // 📝 Simpan transaksi ke database
+      const transaction = await this.createTransactionRecord(
+        data,
+        paymentLink,
+        subTotalPrice,
+        code,
+        expiredAt,
+      );
+
+      await this.createTransactionProducts(transaction.id, data.items);
+      await this.updateVoucherIfUsed(data.voucherOwnedId);
+
+      // 🔍 Ambil data transaksi lengkap
+      const fullTransaction = await this.getFullTransactionDetails(
+        transaction.id,
+      );
+
+      // 📡 Emit event ke Marketplace
+      this.marketplaceClient.emit('transaction_created', {
+        orderId: fullTransaction.id,
+        paymentLink: fullTransaction.payment_link,
+        status: 'waiting_payment',
+        transaction: fullTransaction,
+      });
+
+      context.getChannelRef().ack(context.getMessage());
+
+      return {
+        success: true,
+        message: 'Transaction processed successfully',
+        data: {
+          paymentLink,
+          expiredAt,
+          discountAmount: subTotalPrice - data.grossAmount,
+          taxAmount: data.taxAmount,
         },
       };
+    } catch (error) {
+      context.getChannelRef().nack(context.getMessage());
+      console.error('Error processing transaction:', error.message);
+      return {
+        success: false,
+        message: error.message || 'Failed to process transaction',
+      };
+    }
+  }
 
-      // Send request to Midtrans
+  private async requestPaymentLink(
+    data: any,
+    formattedStartTime: string,
+  ): Promise<string> {
+    try {
       const response = await axios.post(
-        this.midtransUrl,
+        'https://app.sandbox.midtrans.com/snap/v1/transactions',
         {
           transaction_details: {
-            order_id: orderId,
-            gross_amount: totalItemPrice, // Send gross amount before tax
+            order_id: data.orderId,
+            gross_amount: data.grossAmount,
           },
-          item_details: data.items, // Midtrans handles discount separately
-          customer_details: customerDetails,
+          item_details: data.items,
+          customer_details: {
+            first_name: data.customerDetails.first_name || '',
+            last_name: data.customerDetails.last_name || '',
+            email: data.customerDetails.email || '',
+            phone: data.customerDetails.phone || '',
+            billing_address: {
+              address:
+                data.customerDetails.billing_address?.address || 'Unknown',
+              city: data.customerDetails.billing_address?.city || 'Unknown',
+              postal_code:
+                data.customerDetails.billing_address?.postal_code || '00000',
+              country_code: 'IDN',
+            },
+            shipping_address: {
+              address:
+                data.customerDetails.shipping_address?.address || 'Unknown',
+              city: data.customerDetails.shipping_address?.city || 'Unknown',
+              postal_code:
+                data.customerDetails.shipping_address?.postal_code || '00000',
+              country_code: 'IDN',
+            },
+          },
           enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
+          credit_card: {
+            secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
+          },
           expiry: {
             start_time: formattedStartTime,
             unit: 'minute',
             duration: 60,
           },
+          callbacks: {
+            finish: `https://your-domain.com/payment/callback?order_id=${data.orderId}`,
+          },
+          custom_field1: `Store: ${data.storeId}`,
+          custom_field2: `Customer: ${data.customerDetails.email}`,
         },
         {
           headers: {
-            Authorization: `Basic ${this.midtransServerKey}`,
+            Authorization: `Basic U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=`,
             'Content-Type': 'application/json',
           },
         },
       );
 
-      if (response.status === 201) {
-        return response.data.redirect_url;
-      } else {
-        console.error('Midtrans Response Error:', response.data);
-        throw new Error(`Midtrans API Error: ${response.data.message}`);
-      }
+      return response.data.redirect_url;
     } catch (error) {
-      console.error(
-        'Midtrans API Error:',
-        error.response?.data || error.message,
-      );
-      throw new Error(
-        error.response?.data?.message || 'Midtrans API request failed',
+      console.error('Midtrans API Error:', error.message);
+      throw new Error('Failed to request payment link');
+    }
+  }
+
+  private async createTransactionRecord(
+    data: any,
+    paymentLink: string,
+    subTotalPrice: number,
+    code: string,
+    expiredAt: Date,
+  ) {
+    return this.prisma.transaction.create({
+      data: {
+        id: String(data.orderId),
+        date: new Date(),
+        code,
+        transaction_type: 1,
+        payment_method: 5,
+        status: 0,
+        sub_total_price: subTotalPrice,
+        total_price: data.grossAmount,
+        tax_price: data.taxAmount,
+        payment_link: paymentLink,
+        expired_at: expiredAt,
+        store: { connect: { id: String(data.storeId) } },
+        customer: { connect: { id: String(data.customerId) } },
+        voucher_used: data.voucherOwnedId
+          ? { connect: { id: String(data.voucherOwnedId) } }
+          : undefined,
+      },
+    });
+  }
+
+  private async createTransactionProducts(transactionId: string, items: any[]) {
+    for (const item of items.filter(
+      (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+    )) {
+      await this.prisma.transactionProduct.create({
+        data: {
+          transaction: { connect: { id: transactionId } },
+          product_code: { connect: { id: item.id } },
+          name: item.name,
+          price: Number(item.price), // Pastikan ini adalah angka
+          total_price: Number(item.price) * Number(item.quantity),
+          transaction_type: 1, // 1 = Sales, bisa disesuaikan
+          weight: Number(item.weight || 0), // Pastikan ada nilai default jika kosong
+          adjustment_price: Number(item.adjustment_price || 0), // Pastikan ada nilai default jika kosong
+          status: 1, // Status default 1 (misalnya: Sold Out)
+        },
+      });
+      // Update status ProductCode menjadi Sold Out
+      await this.prisma.productCode.update({
+        where: { id: item.id },
+        data: { status: 1 },
+      });
+
+      // Emit event ke inventory
+      this.inventoryClient.emit(
+        { cmd: 'product_code_updated' },
+        {
+          id: item.id,
+          status: 1,
+        },
       );
     }
+  }
+
+  private async updateVoucherIfUsed(voucherOwnedId: string) {
+    if (voucherOwnedId) {
+      await this.prisma.voucherOwned.update({
+        where: { id: voucherOwnedId },
+        data: { is_used: true },
+      });
+    }
+  }
+
+  private async getFullTransactionDetails(transactionId: string) {
+    return this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { store: true, customer: true },
+    });
   }
 }
