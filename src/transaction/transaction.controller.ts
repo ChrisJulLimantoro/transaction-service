@@ -375,23 +375,61 @@ export class TransactionController {
       }
       // 📦 Simpan produk dalam transaksi (Exclude discount item)
       for (const item of filteredItems) {
+        // Ambil data lengkap dari ProductCode untuk mendapatkan informasi produk
+        const productCode = await this.prisma.productCode.findUnique({
+          where: { id: item.id },
+          include: {
+            product: {
+              include: {
+                type: {
+                  include: {
+                    category: {
+                      select: {
+                        name: true,
+                        code: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!productCode) {
+          console.error(`Product code not found for ID: ${item.id}`);
+          continue; // Skip jika product code tidak ditemukan
+        }
+
+        // Format name: "product_code['barcode'] - product[name]"
+        const productName = `${productCode.barcode} - ${productCode.product.name}`;
+
+        // Format type: "type['code'] - category['name']"
+        const productType = `${productCode.product.type.code} - ${productCode.product.type.category.name}`;
+
         await this.prisma.transactionProduct.create({
           data: {
             transaction: { connect: { id: String(data.orderId) } },
             product_code: { connect: { id: String(item.id) } },
-            transaction_type: 1,
+            transaction_type: 1, // Sales
+            name: productName,
+            type: productType,
             price: Number(item.price_per_gram),
             adjustment_price: 0,
             weight: Number(item.weight || 0),
             discount: Number(item.discount || 0),
             total_price: Number(item.price) * Number(item.quantity),
-            status: 1,
+            status: 1, // Sold out
           },
         });
+
+        // Update status ProductCode menjadi Sold Out
         await this.prisma.productCode.update({
           where: { id: item.id },
           data: { status: 1 },
         });
+
+        // Emit event ke inventory
         this.inventoryClient.emit(
           { cmd: 'product_code_updated' },
           {
