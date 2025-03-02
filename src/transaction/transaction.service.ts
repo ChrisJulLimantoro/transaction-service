@@ -528,6 +528,7 @@ export class TransactionService extends BaseService {
             total_price: data.grossAmount,
             tax_price: data.taxAmount,
             payment_link: paymentLink,
+            poin_earned: data.poin_earned,
             expired_at: expiredAt,
             store: { connect: { id: String(data.storeId) } },
             customer: { connect: { id: String(data.customerId) } },
