@@ -396,7 +396,13 @@ export class TransactionService extends BaseService {
 
       const transaction = await this.prisma.transaction.findUnique({
         where: { id: order_id },
-        include: { store: true },
+        include: {
+          store: true,
+          transaction_products: {
+            include: { product_code: true }, // Include product codes to update status
+          },
+          transaction_operations: true,
+        },
       });
 
       if (!transaction) {
@@ -404,6 +410,7 @@ export class TransactionService extends BaseService {
         return { success: false, message: 'Transaction not found' };
       }
 
+      // ✅ SUCCESSFUL TRANSACTION HANDLING
       if (transaction_status === 'settlement' && transaction.status !== 1) {
         await this.prisma.transaction.update({
           where: { id: order_id },
@@ -434,9 +441,87 @@ export class TransactionService extends BaseService {
         };
       }
 
+      // ❌ FAILED TRANSACTION HANDLING (Soft Delete & Reset Voucher & Emit to Inventory)
+      if (
+        transaction_status === 'deny' ||
+        transaction_status === 'expire' ||
+        transaction_status === 'cancel' ||
+        transaction_status === 'failure'
+      ) {
+        console.log(
+          `Soft deleting transaction ${order_id} due to status: ${transaction_status}`,
+        );
+
+        await this.prisma.$transaction(async (tx) => {
+          // 🔹 Soft delete the transaction
+          await tx.transaction.update({
+            where: { id: order_id },
+            data: { deleted_at: new Date() },
+          });
+
+          // 🔹 Soft delete related transaction products
+          if (transaction.transaction_products.length > 0) {
+            await tx.transactionProduct.updateMany({
+              where: { transaction_id: order_id },
+              data: { deleted_at: new Date() },
+            });
+          }
+
+          // 🔹 Soft delete related transaction operations
+          if (transaction.transaction_operations.length > 0) {
+            await tx.transactionOperation.updateMany({
+              where: { transaction_id: order_id },
+              data: { deleted_at: new Date() },
+            });
+          }
+
+          // 🔹 If a voucher was used, mark it as "not used"
+          if (transaction.voucher_own_id) {
+            await tx.voucherOwned.update({
+              where: { id: transaction.voucher_own_id },
+              data: { is_used: false },
+            });
+          }
+
+          // 🔹 Restore Product Code Status (Available) & Emit to Inventory
+          console.log(
+            `Restoring product_code status for transaction: ${order_id}`,
+          );
+
+          for (const item of transaction.transaction_products.filter(
+            (item) =>
+              item.product_code_id !== 'DISCOUNT' &&
+              item.product_code_id !== 'TAX',
+          )) {
+            await tx.productCode.update({
+              where: { id: item.product_code_id },
+              data: { status: 0 }, // Set status to Available
+            });
+
+            // 🔥 Emit product status update to inventory service
+            this.inventoryClient.emit(
+              { cmd: 'product_code_updated' },
+              {
+                id: item.product_code_id,
+                status: 0,
+              },
+            );
+          }
+        });
+
+        this.marketplaceClient.emit('transaction_failed', {
+          id: transaction.id,
+        });
+
+        return {
+          success: false,
+          message: `Transaction ${order_id} has been soft deleted, and products restored.`,
+        };
+      }
+
       return {
         success: false,
-        message: 'Transaction is not in settlement status',
+        message: 'Transaction is not in a recognizable status',
       };
     } catch (error) {
       console.error('Error processing transaction:', error.message);
