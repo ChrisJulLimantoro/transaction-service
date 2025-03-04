@@ -30,6 +30,7 @@ export class TransactionService extends BaseService {
     private readonly prisma: PrismaService,
     @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
     @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
+    @Inject('AUTH') private readonly authClient: ClientProxy,
   ) {
     super(validation);
   }
@@ -712,6 +713,14 @@ export class TransactionService extends BaseService {
         status: 'waiting_payment',
         transaction: fullTransaction,
       });
+
+      this.authClient.emit(
+        { cmd: 'transaction_created' },
+        {
+          store_id: fullTransaction.store_id,
+          transaction_code: fullTransaction.code,
+        },
+      );
 
       context.getChannelRef().ack(context.getMessage());
 
