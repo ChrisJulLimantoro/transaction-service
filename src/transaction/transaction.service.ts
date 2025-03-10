@@ -13,7 +13,7 @@ import { TransactionProductRepository } from 'src/repositories/transaction-produ
 import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RmqContext } from '@nestjs/microservices';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -29,6 +29,8 @@ export class TransactionService extends BaseService {
     protected readonly validation: ValidationService,
     private readonly prisma: PrismaService,
     @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
+    @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
+    @Inject('AUTH') private readonly authClient: ClientProxy,
   ) {
     super(validation);
   }
@@ -206,6 +208,8 @@ export class TransactionService extends BaseService {
   async updateDetail(id: string, data: any): Promise<CustomResponse> {
     data.unit = data.quantity; // for now assume unit is same as quantity [for Operation]
     data.weight = data.quantity; // for now assume weight is same as quantity [for product]
+
+    let updatedDetail;
     if (data.detail_type == 'operation') {
       const transactionDetail =
         await this.transactionOperationRepository.findOne(id);
@@ -218,6 +222,7 @@ export class TransactionService extends BaseService {
         CreateTransactionOperationRequest.schema(),
       );
       await this.transactionOperationRepository.update(id, validatedData);
+      updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
       const transactionDetail =
         await this.transactionProductRepository.findOne(id);
@@ -230,14 +235,15 @@ export class TransactionService extends BaseService {
         CreateTransactionProductRequest.schema(),
       );
       await this.transactionProductRepository.update(id, validatedData);
+      updatedDetail = await this.transactionProductRepository.findOne(id); // Fetch updated data
     }
 
-    await this.syncDetail(data.transaction_id);
+    const syncResult = await this.syncDetail(data.transaction_id); // Get sync detail result
 
-    return CustomResponse.success(
-      'Transaction Detail updated successfully',
-      null,
-    );
+    return CustomResponse.success('Transaction Detail updated successfully', {
+      updatedDetail,
+      syncResult,
+    });
   }
 
   async deleteDetail(id: string): Promise<CustomResponse> {
@@ -384,112 +390,508 @@ export class TransactionService extends BaseService {
   }
 
   // MarketPlace Transaction
-  private readonly midtransUrl =
-    'https://app.sandbox.midtrans.com/snap/v1/transactions';
-  private readonly midtransServerKey =
-    'U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=';
-
-  async processTransactionMarketplace(data: {
-    orderId: string;
-    grossAmount: number;
-    items: any[];
-    customerDetails: any;
-    taxAmount: number; // Receive taxAmount separately from frontend
-  }): Promise<string> {
+  async processMidtransNotification(query: any): Promise<any> {
     try {
-      const orderId = data.orderId;
+      console.log('Notification received from Midtrans:', query);
+      const { transaction_status, order_id } = query;
 
-      // Calculate total item price before discount (gross amount)
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: order_id },
+        include: {
+          store: true,
+          transaction_products: {
+            include: { product_code: true }, // Include product codes to update status
+          },
+          transaction_operations: true,
+        },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found:', order_id);
+        return { success: false, message: 'Transaction not found' };
+      }
+
+      // ✅ SUCCESSFUL TRANSACTION HANDLING
+      if (transaction_status === 'settlement' && transaction.status !== 1) {
+        await this.prisma.transaction.update({
+          where: { id: order_id },
+          data: { status: 1, paid_amount: transaction.total_price },
+        });
+
+        await this.prisma.store.update({
+          where: { id: transaction.store_id },
+          data: { balance: { increment: transaction.total_price } },
+        });
+
+        await this.prisma.balanceLog.create({
+          data: {
+            store_id: transaction.store_id,
+            amount: transaction.total_price,
+            type: 'INCOME',
+            information: `Pemasukan dari transaksi #${transaction.code}`,
+          },
+        });
+
+        this.marketplaceClient.emit('transaction_settlement', {
+          id: transaction.id,
+        });
+
+        return {
+          success: true,
+          redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+        };
+      }
+
+      // ❌ FAILED TRANSACTION HANDLING (Soft Delete & Reset Voucher & Emit to Inventory)
+      if (
+        transaction_status === 'deny' ||
+        transaction_status === 'expire' ||
+        transaction_status === 'cancel' ||
+        transaction_status === 'failure'
+      ) {
+        console.log(
+          `Soft deleting transaction ${order_id} due to status: ${transaction_status}`,
+        );
+
+        await this.prisma.$transaction(async (tx) => {
+          // 🔹 Soft delete the transaction
+          await tx.transaction.update({
+            where: { id: order_id },
+            data: { deleted_at: new Date() },
+          });
+
+          // 🔹 Soft delete related transaction products
+          if (transaction.transaction_products.length > 0) {
+            await tx.transactionProduct.updateMany({
+              where: { transaction_id: order_id },
+              data: { deleted_at: new Date() },
+            });
+          }
+
+          // 🔹 Soft delete related transaction operations
+          if (transaction.transaction_operations.length > 0) {
+            await tx.transactionOperation.updateMany({
+              where: { transaction_id: order_id },
+              data: { deleted_at: new Date() },
+            });
+          }
+
+          // 🔹 If a voucher was used, mark it as "not used"
+          if (transaction.voucher_own_id) {
+            await tx.voucherOwned.update({
+              where: { id: transaction.voucher_own_id },
+              data: { is_used: false },
+            });
+          }
+
+          // 🔹 Restore Product Code Status (Available) & Emit to Inventory
+          console.log(
+            `Restoring product_code status for transaction: ${order_id}`,
+          );
+
+          for (const item of transaction.transaction_products.filter(
+            (item) =>
+              item.product_code_id !== 'DISCOUNT' &&
+              item.product_code_id !== 'TAX',
+          )) {
+            await tx.productCode.update({
+              where: { id: item.product_code_id },
+              data: { status: 0 }, // Set status to Available
+            });
+
+            // 🔥 Emit product status update to inventory service
+            this.inventoryClient.emit(
+              { cmd: 'product_code_updated' },
+              {
+                id: item.product_code_id,
+                status: 0,
+              },
+            );
+          }
+        });
+
+        this.marketplaceClient.emit('transaction_failed', {
+          id: transaction.id,
+        });
+
+        return {
+          success: false,
+          message: `Transaction ${order_id} has been soft deleted, and products restored.`,
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Transaction is not in a recognizable status',
+      };
+    } catch (error) {
+      console.error('Error processing transaction:', error.message);
+      return {
+        success: false,
+        message: error.message || 'Failed to process transaction',
+      };
+    }
+  }
+
+  async processMarketplaceTransaction(data: any, context: RmqContext) {
+    try {
+      console.log('Processing transaction:', data);
+
+      if (
+        !data.orderId ||
+        !data.grossAmount ||
+        !data.items ||
+        !data.customerDetails ||
+        !data.taxAmount
+      ) {
+        throw new Error('Missing required transaction details');
+      }
+
       const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
-
-      // Validate that grossAmount matches total item price (before discount)
       if (totalItemPrice !== data.grossAmount) {
         throw new Error(
           `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
 
-      // Ensure timezone is in Jakarta (GMT+7)
       const now = new Date();
-      now.setHours(now.getHours() + 7); // Set timezone to WIB (+7)
+      now.setHours(now.getHours() + 7);
+      const expiredAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      const expiredTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+      const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
+        .getDate()
+        .toString()
+        .padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(
+          2,
+          '0',
+        )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      // Format `start_time` to be compatible with Midtrans (YYYY-MM-DD HH:MM:SS +0700)
-      const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now
-        .getHours()
-        .toString()
-        .padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now
-        .getSeconds()
-        .toString()
-        .padStart(2, '0')} +0700`;
+      const paymentLink = await this.requestPaymentLink(
+        data,
+        formattedStartTime,
+      );
 
-      // Format customer details
-      const customerDetails = {
-        first_name: data.customerDetails.first_name || '',
-        last_name: data.customerDetails.last_name || '',
-        email: data.customerDetails.email || '',
-        phone: data.customerDetails.phone || '',
-        billing_address: {
-          address: data.customerDetails.billing_address?.address || 'Unknown',
-          city: data.customerDetails.billing_address?.city || 'Unknown',
-          postal_code:
-            data.customerDetails.billing_address?.postal_code || '00000',
-          country_code: 'IDN',
+      const filteredItems = data.items.filter(
+        (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+      ); // Exclude discount
+      const subTotalPrice = filteredItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      const store = await this.prisma.store.findUnique({
+        where: { id: String(data.storeId) },
+        select: { code: true },
+      });
+      const count = await this.prisma.transaction.count({
+        where: { store_id: String(data.storeId) },
+      });
+
+      const code = `SAL/${store?.code}/${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}/${(
+        count + 1
+      )
+        .toString()
+        .padStart(3, '0')}`;
+
+      // 🔥 **Gunakan PrismaService yang sudah diinject**
+      const result = await this.prisma.$transaction(async (tx) => {
+        // **1. Insert Transaksi**
+        const transaction = await tx.transaction.create({
+          data: {
+            id: String(data.orderId),
+            date: new Date(),
+            code,
+            transaction_type: 1,
+            payment_method: 5,
+            status: 0,
+            sub_total_price: subTotalPrice,
+            total_price: data.grossAmount,
+            tax_price: data.taxAmount,
+            payment_link: paymentLink,
+            poin_earned: data.poin_earned,
+            expired_at: expiredAt,
+            store: { connect: { id: String(data.storeId) } },
+            customer: { connect: { id: String(data.customerId) } },
+            voucher_used: data.voucherOwnedId
+              ? { connect: { id: String(data.voucherOwnedId) } }
+              : undefined,
+          },
+        });
+
+        // **2. Insert Produk**
+        const transactionProducts = await Promise.all(
+          data.items
+            .filter((item) => item.id !== 'DISCOUNT' && item.id !== 'TAX')
+            .map(async (item) => {
+              const productCode = await tx.productCode.findUnique({
+                where: { id: item.id },
+                include: {
+                  product: {
+                    include: {
+                      type: {
+                        include: {
+                          category: {
+                            select: { name: true, code: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              });
+
+              if (!productCode) {
+                throw new Error(`Product code not found for ID: ${item.id}`);
+              }
+
+              // **Format Name & Type**
+              const productName = `${productCode.barcode} - ${productCode.product.name}`;
+              const productType = `${productCode.product.type.code} - ${productCode.product.type.category.name}`;
+
+              const weight = Number(item.weight || 1);
+              const pricePerUnit = Number(item.price) / weight;
+
+              return {
+                transaction_id: transaction.id,
+                product_code_id: item.id,
+                name: productName,
+                type: productType,
+                price: pricePerUnit, // Harga per unit
+                total_price: Number(item.price) * Number(item.quantity),
+                transaction_type: 1,
+                weight: weight,
+                adjustment_price: Number(item.adjustment_price || 0),
+                status: 1,
+              };
+            }),
+        );
+
+        // **Insert Semua Produk dalam Batch**
+        await tx.transactionProduct.createMany({ data: transactionProducts });
+
+        // **3. Update Status Produk**
+        for (const item of data.items.filter(
+          (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+        )) {
+          await tx.productCode.update({
+            where: { id: item.id },
+            data: { status: 1 },
+          });
+          this.inventoryClient.emit(
+            { cmd: 'product_code_updated' },
+            {
+              id: item.id,
+              status: 1,
+            },
+          );
+        }
+
+        // **4. Update Voucher Jika Digunakan**
+        if (data.voucherOwnedId) {
+          await tx.voucherOwned.update({
+            where: { id: data.voucherOwnedId },
+            data: { is_used: true },
+          });
+        }
+
+        return transaction;
+      });
+
+      // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
+      const fullTransaction = await this.getFullTransactionDetails(result.id);
+
+      // 📡 Emit event ke Marketplace
+      this.marketplaceClient.emit('transaction_created', {
+        orderId: fullTransaction.id,
+        paymentLink: fullTransaction.payment_link,
+        status: 'waiting_payment',
+        transaction: fullTransaction,
+      });
+
+      this.authClient.emit(
+        { cmd: 'transaction_created' },
+        {
+          store_id: fullTransaction.store_id,
+          transaction_code: fullTransaction.code,
         },
-        shipping_address: {
-          address: data.customerDetails.shipping_address?.address || 'Unknown',
-          city: data.customerDetails.shipping_address?.city || 'Unknown',
-          postal_code:
-            data.customerDetails.shipping_address?.postal_code || '00000',
-          country_code: 'IDN',
+      );
+
+      context.getChannelRef().ack(context.getMessage());
+
+      return {
+        success: true,
+        message: 'Transaction processed successfully',
+        data: {
+          paymentLink,
+          expiredAt,
+          discountAmount: totalItemPrice - data.grossAmount,
+          taxAmount: data.taxAmount,
         },
       };
+    } catch (error) {
+      context.getChannelRef().nack(context.getMessage());
+      console.error('❌ Error processing transaction:', error.message);
+      return {
+        success: false,
+        message: error.message || 'Failed to process transaction',
+      };
+    }
+  }
 
-      // Send request to Midtrans
+  private async requestPaymentLink(
+    data: any,
+    formattedStartTime: string,
+  ): Promise<string> {
+    try {
       const response = await axios.post(
-        this.midtransUrl,
+        'https://app.sandbox.midtrans.com/snap/v1/transactions',
         {
           transaction_details: {
-            order_id: orderId,
-            gross_amount: totalItemPrice, // Send gross amount before tax
+            order_id: data.orderId,
+            gross_amount: data.grossAmount,
           },
-          item_details: data.items, // Midtrans handles discount separately
-          customer_details: customerDetails,
+          item_details: data.items,
+          customer_details: {
+            first_name: data.customerDetails.first_name || '',
+            last_name: data.customerDetails.last_name || '',
+            email: data.customerDetails.email || '',
+            phone: data.customerDetails.phone || '',
+            billing_address: {
+              address:
+                data.customerDetails.billing_address?.address || 'Unknown',
+              city: data.customerDetails.billing_address?.city || 'Unknown',
+              postal_code:
+                data.customerDetails.billing_address?.postal_code || '00000',
+              country_code: 'IDN',
+            },
+            shipping_address: {
+              address:
+                data.customerDetails.shipping_address?.address || 'Unknown',
+              city: data.customerDetails.shipping_address?.city || 'Unknown',
+              postal_code:
+                data.customerDetails.shipping_address?.postal_code || '00000',
+              country_code: 'IDN',
+            },
+          },
           enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
+          credit_card: {
+            secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
+          },
           expiry: {
             start_time: formattedStartTime,
             unit: 'minute',
             duration: 60,
           },
+          custom_field1: `Store: ${data.storeId}`,
+          custom_field2: `Customer: ${data.customerDetails.email}`,
         },
         {
           headers: {
-            Authorization: `Basic ${this.midtransServerKey}`,
+            Authorization: `Basic U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=`,
             'Content-Type': 'application/json',
           },
         },
       );
 
-      if (response.status === 201) {
-        return response.data.redirect_url;
-      } else {
-        console.error('Midtrans Response Error:', response.data);
-        throw new Error(`Midtrans API Error: ${response.data.message}`);
-      }
+      return response.data.redirect_url;
     } catch (error) {
-      console.error(
-        'Midtrans API Error:',
-        error.response?.data || error.message,
-      );
-      throw new Error(
-        error.response?.data?.message || 'Midtrans API request failed',
+      console.error('Midtrans API Error:', error.message);
+      throw new Error('Failed to request payment link');
+    }
+  }
+
+  private async createTransactionRecord(
+    data: any,
+    paymentLink: string,
+    subTotalPrice: number,
+    code: string,
+    expiredAt: Date,
+  ) {
+    return this.prisma.transaction.create({
+      data: {
+        id: String(data.orderId),
+        date: new Date(),
+        code,
+        transaction_type: 1,
+        payment_method: 5,
+        status: 0,
+        sub_total_price: subTotalPrice,
+        total_price: data.grossAmount,
+        tax_price: data.taxAmount,
+        payment_link: paymentLink,
+        expired_at: expiredAt,
+        store: { connect: { id: String(data.storeId) } },
+        customer: { connect: { id: String(data.customerId) } },
+        voucher_used: data.voucherOwnedId
+          ? { connect: { id: String(data.voucherOwnedId) } }
+          : undefined,
+      },
+    });
+  }
+
+  private async createTransactionProducts(transactionId: string, items: any[]) {
+    for (const item of items.filter(
+      (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+    )) {
+      await this.prisma.transactionProduct.create({
+        data: {
+          transaction: { connect: { id: transactionId } },
+          product_code: { connect: { id: item.id } },
+          name: item.name,
+          price: Number(item.price), // Pastikan ini adalah angka
+          total_price: Number(item.price) * Number(item.quantity),
+          transaction_type: 1, // 1 = Sales, bisa disesuaikan
+          weight: Number(item.weight || 0), // Pastikan ada nilai default jika kosong
+          adjustment_price: Number(item.adjustment_price || 0), // Pastikan ada nilai default jika kosong
+          status: 1, // Status default 1 (misalnya: Sold Out)
+        },
+      });
+      // Update status ProductCode menjadi Sold Out
+      await this.prisma.productCode.update({
+        where: { id: item.id },
+        data: { status: 1 },
+      });
+
+      // Emit event ke inventory
+      this.inventoryClient.emit(
+        { cmd: 'product_code_updated' },
+        {
+          id: item.id,
+          status: 1,
+        },
       );
     }
+  }
+
+  private async updateVoucherIfUsed(voucherOwnedId: string) {
+    if (voucherOwnedId) {
+      await this.prisma.voucherOwned.update({
+        where: { id: voucherOwnedId },
+        data: { is_used: true },
+      });
+    }
+  }
+
+  private async getFullTransactionDetails(transactionId: string) {
+    const fullTransaction = await this.prisma.transaction.findUnique({
+      where: { id: String(transactionId) },
+      include: {
+        store: true,
+        customer: true,
+        voucher_used: true,
+        transaction_products: {
+          include: {
+            product_code: true,
+          },
+        },
+      },
+    });
+    return fullTransaction;
   }
 }
