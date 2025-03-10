@@ -32,7 +32,16 @@ export class TransactionController {
   })
   async getTransaction(@Payload() data: any) {
     const filter = { store_id: data.body.auth.store_id };
-    return await this.transactionService.findAll(filter);
+    const { page, limit, sort, search } = data.body;
+    const response = await this.transactionService.findAll(
+      filter,
+      page,
+      limit,
+      { date: 'desc' },
+      search,
+    );
+    console.log(response.data.data);
+    return response;
   }
 
   @MessagePattern({ cmd: 'get:transaction/*' })
@@ -134,27 +143,33 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction-approve/*' })
   @Describe({
     description: 'Transaction Approve',
-    fe: [
-      'transaction/sales:approve',
-    ]
+    fe: ['transaction/sales:approve'],
   })
   async transactionApprove(@Payload() data: any) {
     var newdata = data.body;
     const params = data.params;
     var newstatus = newdata.approve;
-    
+
     // Validation
     if (!Number.isInteger(newstatus) || newstatus < 0 || newstatus > 2) {
-      return CustomResponse.error('Status not valid!', 
-        [{
-          message: 'Status not valid!',
-          field: 'approve',
-          code: 'not_valid',
-        }], 400);
+      return CustomResponse.error(
+        'Status not valid!',
+        [
+          {
+            message: 'Status not valid!',
+            field: 'approve',
+            code: 'not_valid',
+          },
+        ],
+        400,
+      );
     }
-    const res = await this.transactionService.updateStatus(params.id, newstatus);
+    const res = await this.transactionService.updateStatus(
+      params.id,
+      newstatus,
+    );
     if (res.success) {
-      this.financeClient.emit({ cmd:'sales_approved'}, res);
+      this.financeClient.emit({ cmd: 'sales_approved' }, res);
     }
     return res;
   }
@@ -162,28 +177,34 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction-disapprove/*' })
   @Describe({
     description: 'Transaction Disapprove',
-    fe: [
-      'transaction/sales:disapprove',
-    ]
+    fe: ['transaction/sales:disapprove'],
   })
   async transactionDisapprove(@Payload() data: any) {
     var newdata = data.body;
     const params = data.params;
     var newstatus = newdata.approve;
-    
+
     // Validation
     if (!Number.isInteger(newstatus) || newstatus < 0 || newstatus > 2) {
-      return CustomResponse.error('Status not valid!', 
-        [{
-          message: 'Status not valid!',
-          field: 'approve',
-          code: 'not_valid',
-        }], 400);
+      return CustomResponse.error(
+        'Status not valid!',
+        [
+          {
+            message: 'Status not valid!',
+            field: 'approve',
+            code: 'not_valid',
+          },
+        ],
+        400,
+      );
     }
 
-    const res = await this.transactionService.updateStatus(params.id, newstatus);
+    const res = await this.transactionService.updateStatus(
+      params.id,
+      newstatus,
+    );
     if (res.success) {
-      this.financeClient.emit({ cmd:'sales_disapproved'}, res);
+      this.financeClient.emit({ cmd: 'sales_disapproved' }, res);
     }
     return res;
   }

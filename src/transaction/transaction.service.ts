@@ -292,7 +292,7 @@ export class TransactionService extends BaseService {
 
     let subtotal = 0;
     let tax = null;
-    for (const operation of operations) {
+    for (const operation of operations.data) {
       subtotal +=
         operation.unit * operation.price +
         parseFloat(operation.adjustment_price);
@@ -300,7 +300,7 @@ export class TransactionService extends BaseService {
         tax = parseFloat(operation.transaction.store.tax_percentage);
       }
     }
-    for (const product of products) {
+    for (const product of products.data) {
       subtotal +=
         product.weight * product.price + parseFloat(product.adjustment_price);
       if (tax == null) {
@@ -377,7 +377,10 @@ export class TransactionService extends BaseService {
       return CustomResponse.error('Transaction not found', null, 404);
     }
     const res = await this.repository.update(id, { approve: status });
-    return CustomResponse.success('Transaction status updated successfully', res);
+    return CustomResponse.success(
+      'Transaction status updated successfully',
+      res,
+    );
   }
 
   // MarketPlace Transaction
