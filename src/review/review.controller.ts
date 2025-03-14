@@ -56,6 +56,7 @@ export class ReviewController {
   }
 
   @EventPattern({ cmd: 'edit_review' })
+  @Exempt()
   async handleReplyReview(@Payload() data: any, @Ctx() context: RmqContext) {
     const response = await this.reviewService.editReview(data);
     if (response) {
