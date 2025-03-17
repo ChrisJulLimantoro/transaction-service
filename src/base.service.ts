@@ -64,4 +64,16 @@ export abstract class BaseService {
     await this.repository.delete(id);
     return CustomResponse.success('Data deleted!', data, 200);
   }
+
+  async sync(data: any[]) {
+    const transformedData = data.map((d) => this.transformCreateData(d));
+  
+    const d = await this.repository.sync(transformedData); // Pass all transformed data at once
+  
+    if (!d) {
+      return CustomResponse.error('Failed to sync Data', null, 500);
+    }
+  
+    return CustomResponse.success('Data Synced!', d, 200);
+  }
 }

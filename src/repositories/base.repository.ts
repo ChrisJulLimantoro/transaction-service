@@ -83,4 +83,17 @@ export class BaseRepository<T> {
       where: filter,
     });
   }
+
+  async sync(data: any[]) {
+    const datas = await Promise.all(
+      data.map((d) =>
+        this.prisma[this.modelName].upsert({
+          where: { id: d.id },
+          update: d,
+          create: d,
+        })
+      )
+    );
+    return datas;
+  }
 }
