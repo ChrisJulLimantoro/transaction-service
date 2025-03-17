@@ -28,4 +28,14 @@ export class ReviewService {
       },
     });
   }
+
+  async editReview(data: any) {
+    return await this.prismaService.transactionReview.update({
+      where: { id: data.id },
+      data: {
+        rating: data.rating,
+        review: data.review,
+      },
+    });
+  }
 }

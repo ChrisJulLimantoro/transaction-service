@@ -54,4 +54,19 @@ export class ReviewController {
       statusCode: 201,
     };
   }
+
+  @EventPattern({ cmd: 'edit_review' })
+  @Exempt()
+  async handleReplyReview(@Payload() data: any, @Ctx() context: RmqContext) {
+    const response = await this.reviewService.editReview(data);
+    if (response) {
+      context.getChannelRef().ack(context.getMessage());
+    }
+    return {
+      data: response,
+      message: 'Review edited successfully!',
+      success: true,
+      statusCode: 201,
+    };
+  }
 }
