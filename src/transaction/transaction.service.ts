@@ -184,6 +184,7 @@ export class TransactionService extends BaseService {
         },
       );
     } else {
+      data.total_price = data.unit * data.price;
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
