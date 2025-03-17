@@ -184,7 +184,7 @@ export class TransactionService extends BaseService {
         },
       );
     } else {
-      data.total_price = data.unit * data.price;
+      data.total_price = data.unit * data.price + data.adjustment_price;
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
@@ -212,6 +212,8 @@ export class TransactionService extends BaseService {
 
     let updatedDetail;
     if (data.detail_type == 'operation') {
+      data.total_price =
+        data.unit * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail =
         await this.transactionOperationRepository.findOne(id);
       if (!transactionDetail) {
@@ -225,12 +227,15 @@ export class TransactionService extends BaseService {
       await this.transactionOperationRepository.update(id, validatedData);
       updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
+      data.total_price =
+        data.weight * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail =
         await this.transactionProductRepository.findOne(id);
       if (!transactionDetail) {
         return CustomResponse.error('Transaction Detail not found', null, 404);
       }
       const transactionDetailData = new CreateTransactionProductRequest(data);
+
       const validatedData = this.validation.validate(
         transactionDetailData,
         CreateTransactionProductRequest.schema(),
