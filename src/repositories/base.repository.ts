@@ -20,16 +20,85 @@ export class BaseRepository<T> {
   }
 
   // Get all records with possible relations and filter criteria
-  async findAll(filter?: Record<string, any>): Promise<T[]> {
-    const whereConditions: Record<string, any> = {
-      ...(this.isSoftDelete ? { deleted_at: null } : {}),
-      ...filter, // Add the provided filter conditions
+  async findAll(
+    filter?: Record<string, any>,
+    page?: number,
+    limit?: number,
+    sort?: Record<string, 'asc' | 'desc'>,
+    search?: string,
+  ): Promise<{
+    data: any[];
+    total?: number;
+    page?: number;
+    totalPages?: number;
+  }> {
+    const fields = (await this.getModelFields()).filter(
+      (field) => !field.name.includes('id'),
+    );
+    const stringFields = fields.filter(
+      (field) => field.type.toLowerCase() === 'string',
+    );
+
+    const searchConditions = search
+      ? {
+          OR: stringFields.map((field) => ({
+            [field.name]: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          })),
+        }
+      : {};
+
+    // Ensure correct WHERE structure: deleted_at IS NULL AND (OR conditions)
+    const whereConditions = {
+      AND: {
+        ...(this.isSoftDelete
+          ? { deleted_at: null }
+          : { NOT: { deleted_at: null } }),
+        ...searchConditions,
+        ...filter,
+      },
     };
 
-    return this.prisma[this.modelName].findMany({
-      where: whereConditions, // Apply dynamic filter along with soft delete condition
-      include: this.relations,
+    // console.log(whereConditions, whereConditions["AND"]["OR"]);
+
+    // Apply sorting
+    const orderBy = sort
+      ? Object.entries(sort).map(([key, value]) => ({
+          [key]: value,
+        }))
+      : undefined;
+
+    // If page & limit are not provided, return all records (no pagination)
+    if (!page || !limit || page === 0 || limit === 0) {
+      const data = await this.prisma[this.modelName].findMany({
+        where: whereConditions,
+        include: this.relations,
+      });
+      return { data }; // No pagination metadata
+    }
+
+    // Get total count before applying pagination
+    const total = await this.prisma[this.modelName].count({
+      where: whereConditions,
     });
+
+    // Fetch paginated records
+    const data = await this.prisma[this.modelName].findMany({
+      where: whereConditions,
+      include: this.relations,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: orderBy,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Find a record by ID with possible relations and filter criteria
@@ -95,5 +164,17 @@ export class BaseRepository<T> {
       )
     );
     return datas;
+  }
+
+  async getModelFields(): Promise<Record<string, string>[]> {
+    const model = Prisma.dmmf.datamodel.models.find(
+      (m) => m.name.toLowerCase() === this.modelName.toLowerCase(),
+    );
+    if (!model) throw new Error(`Model ${this.modelName} not found`);
+
+    return model.fields.map((field) => ({
+      name: field.name,
+      type: field.type,
+    }));
   }
 }

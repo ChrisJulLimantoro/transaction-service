@@ -33,7 +33,16 @@ export class TransactionController {
   })
   async getTransaction(@Payload() data: any) {
     const filter = { store_id: data.body.auth.store_id };
-    return await this.transactionService.findAll(filter);
+    const { page, limit, sort, search } = data.body;
+    const response = await this.transactionService.findAll(
+      filter,
+      page,
+      limit,
+      { date: 'desc' },
+      search,
+    );
+    console.log(response.data.data);
+    return response;
   }
 
   @MessagePattern({ cmd: 'get:transaction/*' })

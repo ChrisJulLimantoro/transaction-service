@@ -184,6 +184,7 @@ export class TransactionService extends BaseService {
         },
       );
     } else {
+      data.total_price = data.unit * data.price + data.adjustment_price;
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
@@ -211,6 +212,8 @@ export class TransactionService extends BaseService {
 
     let updatedDetail;
     if (data.detail_type == 'operation') {
+      data.total_price =
+        data.unit * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail =
         await this.transactionOperationRepository.findOne(id);
       if (!transactionDetail) {
@@ -224,12 +227,15 @@ export class TransactionService extends BaseService {
       await this.transactionOperationRepository.update(id, validatedData);
       updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
+      data.total_price =
+        data.weight * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail =
         await this.transactionProductRepository.findOne(id);
       if (!transactionDetail) {
         return CustomResponse.error('Transaction Detail not found', null, 404);
       }
       const transactionDetailData = new CreateTransactionProductRequest(data);
+
       const validatedData = this.validation.validate(
         transactionDetailData,
         CreateTransactionProductRequest.schema(),
@@ -298,7 +304,7 @@ export class TransactionService extends BaseService {
 
     let subtotal = 0;
     let tax = null;
-    for (const operation of operations) {
+    for (const operation of operations.data) {
       subtotal +=
         operation.unit * operation.price +
         parseFloat(operation.adjustment_price);
@@ -306,7 +312,7 @@ export class TransactionService extends BaseService {
         tax = parseFloat(operation.transaction.store.tax_percentage);
       }
     }
-    for (const product of products) {
+    for (const product of products.data) {
       subtotal +=
         product.weight * product.price + parseFloat(product.adjustment_price);
       if (tax == null) {
