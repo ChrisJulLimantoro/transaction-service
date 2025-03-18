@@ -121,6 +121,7 @@ export class TransactionService extends BaseService {
 
     data = transaction;
     data.transaction_details = transDetails;
+    this.generatePdf(transaction.id);
     return CustomResponse.success('Transaction created successfully', data);
   }
 
@@ -138,7 +139,7 @@ export class TransactionService extends BaseService {
         });
       }
     }
-    await this.generatePdf(id);
+    this.generatePdf(id);
     return super.update(id, data);
   }
 
@@ -410,19 +411,19 @@ export class TransactionService extends BaseService {
     if (!pdfPath) {
       return CustomResponse.error('Failed to generate PDF', null, 500);
     }
-    // if (transaction.nota_link != null) {
-    //   const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
-    //   const deleteFile = (filePath: string) => {
-    //     fs.unlink(filePath, (err) => {
-    //       if (err) {
-    //         console.error('Error deleting file:', err);
-    //       } else {
-    //         console.log('File deleted successfully:', filePath);
-    //       }
-    //     });
-    //   };
-    //   deleteFile(filePath);
-    // }
+    if (transaction.nota_link != null) {
+      const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
+      const deleteFile = (filePath: string) => {
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.error('Error deleting file:', err);
+          } else {
+            console.log('File deleted successfully:', filePath);
+          }
+        });
+      };
+      deleteFile(filePath);
+    }
     const updatedTransaction = await this.repository.update(id, {
       nota_link: pdfPath.split('/storage/notas/')[1],
     });
