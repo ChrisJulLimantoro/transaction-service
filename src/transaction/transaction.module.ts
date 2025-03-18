@@ -7,6 +7,7 @@ import { TransactionOperationRepository } from 'src/repositories/transaction-ope
 import { TransactionProductRepository } from 'src/repositories/transaction-product.repository';
 import { SharedModule } from 'src/shared.module';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
+import { PdfService } from './pdf.service';
 
 @Module({
   providers: [
@@ -16,6 +17,7 @@ import { ProductCodeRepository } from 'src/repositories/product-code.repository'
     TransactionOperationRepository,
     TransactionProductRepository,
     ProductCodeRepository,
+    PdfService,
   ],
   controllers: [TransactionController],
   imports: [SharedModule],

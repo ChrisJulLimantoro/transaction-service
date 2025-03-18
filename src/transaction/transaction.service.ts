@@ -14,12 +14,16 @@ import { TransactionOperationRepository } from 'src/repositories/transaction-ope
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
 import { ClientProxy, RmqContext } from '@nestjs/microservices';
+import { PdfService } from './pdf.service';
+import * as fs from 'fs-extra';
+import * as path from 'path';
 
 @Injectable()
 export class TransactionService extends BaseService {
   protected repository = this.transactionRepository;
   protected createSchema = CreateTransactionRequest.schema();
   protected updateSchema = UpdateTransactionRequest.schema();
+  private storagePath = path.join(__dirname, '..', '..', 'storage', 'notas');
 
   constructor(
     private readonly transactionRepository: TransactionRepository,
@@ -27,6 +31,7 @@ export class TransactionService extends BaseService {
     private readonly transactionOperationRepository: TransactionOperationRepository,
     private readonly productCodeRepository: ProductCodeRepository,
     protected readonly validation: ValidationService,
+    protected readonly pdfService: PdfService,
     private readonly prisma: PrismaService,
     @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
     @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
@@ -133,6 +138,7 @@ export class TransactionService extends BaseService {
         });
       }
     }
+    await this.generatePdf(id);
     return super.update(id, data);
   }
 
@@ -393,6 +399,47 @@ export class TransactionService extends BaseService {
       'Transaction status updated successfully',
       res,
     );
+  }
+
+  async generatePdf(id: string) {
+    const transaction = await this.repository.findOne(id);
+    if (!transaction) {
+      return CustomResponse.error('Transaction not found', null, 404);
+    }
+    const pdfPath = await this.pdfService.generateSalesNota(transaction);
+    if (!pdfPath) {
+      return CustomResponse.error('Failed to generate PDF', null, 500);
+    }
+    // if (transaction.nota_link != null) {
+    //   const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
+    //   const deleteFile = (filePath: string) => {
+    //     fs.unlink(filePath, (err) => {
+    //       if (err) {
+    //         console.error('Error deleting file:', err);
+    //       } else {
+    //         console.log('File deleted successfully:', filePath);
+    //       }
+    //     });
+    //   };
+    //   deleteFile(filePath);
+    // }
+    const updatedTransaction = await this.repository.update(id, {
+      nota_link: pdfPath.split('/storage/notas/')[1],
+    });
+
+    return CustomResponse.success(
+      'PDF generated successfully',
+      updatedTransaction,
+    );
+  }
+
+  async getPdfPath(transactionId: string): Promise<string> {
+    const transaction = await this.repository.findOne(transactionId);
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+    const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
+    return fs.existsSync(filePath) ? filePath : null;
   }
 
   // MarketPlace Transaction

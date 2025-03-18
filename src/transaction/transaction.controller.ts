@@ -55,6 +55,20 @@ export class TransactionController {
     return await this.transactionService.findOne(id);
   }
 
+  @MessagePattern({ cmd: 'get:transaction-nota/*' })
+  @Describe({
+    description: 'Get Transaction Nota',
+    fe: [
+      'transaction/sales:detail',
+      'transaction/sales:edit',
+      'transaction/sales:create',
+    ],
+  })
+  async getTransactionNota(@Payload() data: any) {
+    const id = data.params.id;
+    return await this.transactionService.getPdfPath(id);
+  }
+
   @MessagePattern({ cmd: 'post:transaction' })
   @Describe({
     description: 'Create Transaction',

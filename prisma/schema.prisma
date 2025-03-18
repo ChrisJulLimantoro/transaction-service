@@ -335,6 +335,7 @@ model Transaction {
   customer_id      String    @db.Uuid
   voucher_own_id   String?   @db.Uuid
   employee_id      String?   @db.Uuid
+  nota_link         String?
 
   store                  Store                  @relation(fields: [store_id], references: [id])
   customer               Customer               @relation(fields: [customer_id], references: [id])
