@@ -1,7 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { CompanyService } from './company.service';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import { Ctx, EventPattern, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
+import { CustomResponse } from 'src/exception/dto/custom-response.dto';
 
 @Controller('company')
 export class CompanyController {
@@ -53,6 +54,16 @@ export class CompanyController {
       context,
       () => this.service.delete(data),
       'Error processing company_deleted event',
+    );
+  }
+
+  @EventPattern({ cmd: 'company_sync' })
+  @Exempt()
+  async companySync(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.handleEvent(
+      context,
+      () => this.service.sync(data),
+      'Error processing company_sync event',
     );
   }
 }

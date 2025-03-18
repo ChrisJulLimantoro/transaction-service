@@ -153,6 +153,19 @@ export class BaseRepository<T> {
     });
   }
 
+  async sync(data: any[]) {
+    const datas = await Promise.all(
+      data.map((d) =>
+        this.prisma[this.modelName].upsert({
+          where: { id: d.id },
+          update: d,
+          create: d,
+        })
+      )
+    );
+    return datas;
+  }
+
   async getModelFields(): Promise<Record<string, string>[]> {
     const model = Prisma.dmmf.datamodel.models.find(
       (m) => m.name.toLowerCase() === this.modelName.toLowerCase(),

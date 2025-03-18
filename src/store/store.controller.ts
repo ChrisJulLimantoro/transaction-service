@@ -72,4 +72,14 @@ export class StoreController {
       'Error processing store_deleted event',
     );
   }
+  
+  @EventPattern({ cmd: 'store_sync' })
+  @Exempt()
+  async storeSync(@Payload() data: any, @Ctx() context: RmqContext) {
+    await this.handleEvent(
+      context,
+      () => this.service.sync(data),
+      'Error processing store_sync event',
+    );
+  }
 }
