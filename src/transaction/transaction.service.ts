@@ -760,6 +760,7 @@ export class TransactionService extends BaseService {
       // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
       const fullTransaction = await this.getFullTransactionDetails(result.id);
 
+      this.generatePdf(fullTransaction.id);
       // 📡 Emit event ke Marketplace
       this.marketplaceClient.emit('transaction_created', {
         orderId: fullTransaction.id,
