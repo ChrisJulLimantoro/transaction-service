@@ -489,6 +489,13 @@ export class TransactionService extends BaseService {
         this.marketplaceClient.emit('transaction_settlement', {
           id: transaction.id,
         });
+        this.authClient.emit(
+          { cmd: 'transaction_settlement' },
+          {
+            store_id: transaction.store_id,
+            transaction_code: transaction.code,
+          },
+        );
 
         return {
           success: true,
@@ -567,6 +574,14 @@ export class TransactionService extends BaseService {
         this.marketplaceClient.emit('transaction_failed', {
           id: transaction.id,
         });
+
+        this.authClient.emit(
+          { cmd: 'transaction_failed' },
+          {
+            store_id: transaction.store_id,
+            transaction_code: transaction.code,
+          },
+        );
 
         return {
           success: false,
@@ -760,6 +775,7 @@ export class TransactionService extends BaseService {
       // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
       const fullTransaction = await this.getFullTransactionDetails(result.id);
 
+      this.generatePdf(fullTransaction.id);
       // 📡 Emit event ke Marketplace
       this.marketplaceClient.emit('transaction_created', {
         orderId: fullTransaction.id,

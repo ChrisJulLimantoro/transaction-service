@@ -46,6 +46,11 @@ export class PdfService {
       }),
     );
 
+    const voucherDiscount =
+      Number(transaction.sub_total_price) +
+      Number(transaction.tax_price) -
+      Number(transaction.total_price);
+
     const htmlContent = `
     <!doctype html>
     <html lang="en">
@@ -136,7 +141,7 @@ export class PdfService {
                 <!-- Order Details -->
                 <div class="order-details">
                     <div><strong>Order Date:</strong> ${this.formatDate(transaction.date)}</div>
-                    <div><strong>Sales person:</strong> ${transaction.employee.name}</div>
+                    <div><strong>Sales person:</strong> ${transaction.employee?.name ?? 'Marketplace'}</div>
                 </div>
             <!-- Customer Info -->
                 <div class="info">
@@ -205,6 +210,8 @@ export class PdfService {
         <div class="total-section">
             <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>
             <div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>
+            <div>Poin Earned: <strong>${transaction.poin_earned}</strong></div>
+            <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>
             <hr />
             <div><strong>Total: ${this.formatCurrency(transaction.total_price)}</strong></div>
         </div>
