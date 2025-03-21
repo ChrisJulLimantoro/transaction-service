@@ -73,4 +73,18 @@ export class CustomerService {
 
     return CustomResponse.success('Users retrieved!', users, 200);
   }
+  async findById(id: string) {
+    const user = await this.prismaService.customer.findUnique({
+      where: { id: id, deleted_at: null },
+    });
+    if (!user) throw new Error('User not found!');
+    return CustomResponse.success('User retrieved!', user, 200);
+  }
+  async findByEmail(email: string) {
+    const user = await this.prismaService.customer.findUniqueOrThrow({
+      where: { email: email, deleted_at: null },
+    });
+    if (!user) throw new Error('User not found!');
+    return CustomResponse.success('User retrieved!', user, 200);
+  }
 }

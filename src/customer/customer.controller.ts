@@ -84,4 +84,32 @@ export class CustomerController {
     const response = await this.customerService.findAll(data);
     return response;
   }
+
+  @MessagePattern({ cmd: 'get:customer/*' })
+  @Describe({
+    description: 'Get customer by id',
+    fe: [
+      'transaction/sales:add',
+      'transaction/sales:edit',
+      'transaction/sales:detail',
+    ],
+  })
+  async getCustomerById(@Payload() data: any) {
+    const response = await this.customerService.findById(data.params.id);
+    return response;
+  }
+
+  @MessagePattern({ cmd: 'get:customer-email/*' })
+  @Describe({
+    description: 'Get customer by email',
+    fe: [
+      'transaction/sales:add',
+      'transaction/sales:edit',
+      'transaction/sales:detail',
+    ],
+  })
+  async getCustomerByEmail(@Payload() data: any) {
+    const response = await this.customerService.findByEmail(data.params.id);
+    return response;
+  }
 }

@@ -36,6 +36,13 @@ model Type {
   name        String
   category_id String @db.Uuid
 
+  // PriceReduction
+  percent_price_reduction Decimal @db.Decimal @default(0)
+  fixed_price_reduction   Decimal @db.Decimal @default(0)
+  // BrokenReduction
+  percent_broken_reduction Decimal @db.Decimal @default(0)
+  fixed_broken_reduction   Decimal @db.Decimal @default(0)
+
   category Category  @relation(fields: [category_id], references: [id])
   products Product[]
   prices   Price[]
