@@ -385,7 +385,22 @@ export class TransactionService extends BaseService {
         await this.transactionOperationRepository.delete(detail.id);
       }
       const dataDeleted = await this.repository.delete(id);
-      console.log('Transaction Deleted!');
+
+      // Delete File Nota
+      if (transaction.nota_link != null) {
+        const filePath = path.join(
+          this.storagePath,
+          `${transaction.nota_link}`,
+        );
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.error('Error deleting file:', err);
+          } else {
+            console.log('File deleted successfully:', filePath);
+          }
+        });
+      }
+
       return CustomResponse.success(
         'Transaction deleted successfully',
         dataDeleted,
