@@ -140,6 +140,7 @@ model Store {
   poin_config    Int     @default(0)
   tax_percentage    Decimal @db.Decimal @default(11)
   balance        Decimal @default(0) @db.Decimal
+  grace_period   Int     @default(0)
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]

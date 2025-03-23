@@ -51,7 +51,7 @@ export class PdfService {
       Number(transaction.tax_price) -
       Number(transaction.total_price);
 
-    const htmlContent = `
+    var htmlContent = `
     <!doctype html>
     <html lang="en">
     <head>
@@ -138,6 +138,7 @@ export class PdfService {
         <div class="header">
             <div>
                 <div class="title">#${transaction.code}</div>
+                <div class="title">${transaction.transaction_type == 1 ? 'Sales' : 'Purchase'}</div>
                 <!-- Order Details -->
                 <div class="order-details">
                     <div><strong>Order Date:</strong> ${this.formatDate(transaction.date)}</div>
@@ -208,11 +209,13 @@ export class PdfService {
 
         <!-- Total Section -->
         <div class="total-section">
-            <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>
-            <div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>
+            <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>`;
+    if (transaction.transaction_type == 1) {
+      htmlContent += `<div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>
             <div>Poin Earned: <strong>${transaction.poin_earned}</strong></div>
-            <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>
-            <hr />
+            <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>`;
+    }
+    htmlContent += `<hr />
             <div><strong>Total: ${this.formatCurrency(transaction.total_price)}</strong></div>
         </div>
 

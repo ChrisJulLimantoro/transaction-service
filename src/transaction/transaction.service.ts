@@ -178,7 +178,8 @@ export class TransactionService extends BaseService {
       const code = await this.productCodeRepository.update(
         data.product_code_id,
         {
-          status: data.transaction_type == 1 ? 1 : 0,
+          status:
+            data.transaction_type == 1 ? 1 : data.transaction_type == 2 ? 2 : 0,
         },
       );
       console.log('code', code);
@@ -274,7 +275,12 @@ export class TransactionService extends BaseService {
       const code = await this.productCodeRepository.update(
         product.product_code_id,
         {
-          status: product.transaction_type == 1 ? 0 : 1,
+          status:
+            product.transaction_type == 1
+              ? 0
+              : product.transaction_type == 2
+                ? 1
+                : 0,
         },
       );
       console.log('code deleted', code);
@@ -322,12 +328,11 @@ export class TransactionService extends BaseService {
     for (const product of products.data) {
       subtotal +=
         product.weight * product.price + parseFloat(product.adjustment_price);
-      if (tax == null) {
+      if (tax == null && product.transaction_type == 1) {
         tax = parseFloat(product.transaction.store.tax_percentage);
       }
     }
 
-    console.log('sync tax', tax);
     const updateData = {
       sub_total_price: subtotal,
       tax_price: subtotal * (tax / 100),

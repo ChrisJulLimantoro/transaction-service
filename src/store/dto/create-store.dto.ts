@@ -9,6 +9,7 @@ export class CreateStoreRequest {
   is_float_price: boolean | null;
   poin_config: number | null;
   tax_percentage: number | null;
+  grace_period: number | null;
 
   constructor({
     id,
@@ -20,6 +21,7 @@ export class CreateStoreRequest {
     is_float_price,
     poin_config,
     tax_percentage,
+    grace_period,
   }) {
     this.id = id;
     this.code = code;
@@ -30,6 +32,7 @@ export class CreateStoreRequest {
     this.poin_config = parseFloat(poin_config);
     this.tax_percentage = parseFloat(tax_percentage);
     this.company_id = company_id;
+    this.grace_period = parseInt(grace_period);
   }
 
   static schema() {
@@ -43,6 +46,7 @@ export class CreateStoreRequest {
       is_float_price: z.boolean().nullable().optional(),
       poin_config: z.number().nullable().optional(),
       tax_percentage: z.number().nullable().optional(),
+      grace_period: z.number().nullable().optional(),
     });
   }
 }
