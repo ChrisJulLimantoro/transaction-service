@@ -365,7 +365,7 @@ model Transaction {
 model TransactionProduct {
   id               String  @id @default(uuid()) @db.Uuid
   transaction_id   String  @db.Uuid
-  product_code_id  String  @db.Uuid
+  product_code_id  String?  @db.Uuid
   transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
   name             String?
   type             String?
@@ -378,7 +378,7 @@ model TransactionProduct {
   comment          String? @db.Text
 
   transaction  Transaction @relation(fields: [transaction_id], references: [id])
-  product_code ProductCode @relation(fields: [product_code_id], references: [id])
+  product_code ProductCode? @relation(fields: [product_code_id], references: [id])
 
   created_at        DateTime           @default(now())
   updated_at        DateTime           @updatedAt

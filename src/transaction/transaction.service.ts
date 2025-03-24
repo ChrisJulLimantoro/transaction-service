@@ -156,7 +156,7 @@ export class TransactionService extends BaseService {
     var result = null;
     data.transaction_type = transaction.transaction_type;
     data.status = transaction.status == 2 ? 2 : 1;
-    if (data.detail_type == 'product') {
+    if (data.detail_type == 'product' && data.product_code_id != null) {
       // Check if item available
       const product = await this.productCodeRepository.findOne(
         data.product_code_id,
@@ -191,7 +191,7 @@ export class TransactionService extends BaseService {
           status: code.status,
         },
       );
-    } else {
+    } else if (data.detail_type == 'operation') {
       data.total_price = data.unit * data.price + data.adjustment_price;
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
@@ -199,6 +199,13 @@ export class TransactionService extends BaseService {
         CreateTransactionOperationRequest.schema(),
       );
       result = await this.transactionOperationRepository.create(validatedData);
+    } else {
+      const transactionDetail = new CreateTransactionProductRequest(data);
+      validatedData = this.validation.validate(
+        transactionDetail,
+        CreateTransactionProductRequest.schema(),
+      );
+      result = await this.transactionProductRepository.create(validatedData);
     }
 
     if (!result) {

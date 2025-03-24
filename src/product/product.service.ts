@@ -156,4 +156,82 @@ export class ProductService extends BaseService {
 
     return CustomResponse.success('Product purchase found!', data);
   }
+
+  async getPurchaseNonProduct(
+    type_id: string,
+    store_id: string,
+    weight: number,
+    is_broken: boolean,
+  ) {
+    // Get the type and Category
+    const type = await this.prisma.type.findFirst({
+      where: {
+        id: type_id,
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    if (!type) {
+      return CustomResponse.error('Type not found!', 404);
+    }
+
+    // Get the store
+    const store = await this.prisma.store.findFirst({
+      where: {
+        id: store_id,
+      },
+    });
+
+    if (!store) {
+      return CustomResponse.error('Store not found!', 404);
+    }
+
+    // Find the Current Price of Type
+    const price = await this.prisma.price.findFirst({
+      where: {
+        type_id: type_id,
+        date: {
+          lte: new Date(),
+        },
+        is_active: true,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    if (!price) {
+      return CustomResponse.error('Price not found!', 404);
+    }
+
+    // Calculate and Construct the new Response data
+    var newPrice = Number(price.price);
+    var adjust = 0;
+    if (is_broken) {
+      adjust =
+        Number(type.fixed_broken_reduction) > 0
+          ? Number(type.fixed_broken_reduction)
+          : (Number(type.percent_broken_reduction) * newPrice * weight) / 100;
+    } else {
+      adjust =
+        Number(type.fixed_price_reduction) > 0
+          ? Number(type.fixed_price_reduction)
+          : (Number(type.percent_price_reduction) * newPrice * weight) / 100;
+    }
+
+    // Construct the new Response data
+    const data = {
+      id: null,
+      barcode: null,
+      name: 'Outside Product',
+      price: newPrice,
+      adjustment_price: adjust * -1,
+      weight: weight,
+      type: `${type.code} - ${type.category.name}`,
+    };
+
+    return CustomResponse.success('Product purchase found!', data);
+  }
 }

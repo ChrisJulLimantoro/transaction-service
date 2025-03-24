@@ -93,4 +93,19 @@ export class ProductController {
     const store = data.body.auth.store_id;
     return this.service.getProductPurchase(id, store, data.body.is_broken);
   }
+
+  @MessagePattern({ cmd: 'get:purchase-non-product' })
+  @Describe({
+    description: 'Get Purchase Info',
+    fe: ['transaction/purchase:add', 'transaction/purchase:edit'],
+  })
+  async getPurchaseInfo(@Payload() data: any) {
+    const body = data.body;
+    return this.service.getPurchaseNonProduct(
+      body.type_id,
+      body.auth.store_id,
+      body.weight,
+      body.is_broken,
+    );
+  }
 }

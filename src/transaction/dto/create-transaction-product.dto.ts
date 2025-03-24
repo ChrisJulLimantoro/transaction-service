@@ -1,7 +1,7 @@
 import { z } from 'zod';
 export class CreateTransactionProductRequest {
   transaction_id: string;
-  product_code_id: string;
+  product_code_id: string | null;
   name: string | null;
   type: string | null;
   transaction_type: number;
@@ -41,7 +41,7 @@ export class CreateTransactionProductRequest {
   static schema() {
     return z.object({
       transaction_id: z.string().uuid(),
-      product_code_id: z.string().uuid(),
+      product_code_id: z.string().uuid().nullable().optional(),
       name: z.string().nullable(),
       type: z.string().nullable(),
       transaction_type: z.number(),
