@@ -371,6 +371,7 @@ model TransactionProduct {
   type             String?
   weight           Decimal @db.Decimal
   price            Decimal @db.Decimal
+  is_broken        Boolean @default(false)
   adjustment_price Decimal @db.Decimal
   discount         Decimal @db.Decimal @default(0)
   total_price      Decimal @db.Decimal

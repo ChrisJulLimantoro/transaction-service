@@ -54,7 +54,8 @@ export class ProductService extends BaseService {
     return CustomResponse.success('Product code updated!', code, 200);
   }
 
-  async getProductPurchase(code: string, store_id: string, is_broken: boolean) {
+  async getProductPurchase(code: string, store_id: string, is_broken: any) {
+    is_broken = is_broken === true || is_broken === 'true';
     const product = (await this.productCodeRepository.findCode(code)) as any;
     if (!product) {
       return CustomResponse.error('Product not found!', 404);
@@ -152,6 +153,7 @@ export class ProductService extends BaseService {
       weight: product.weight,
       type: `${type.code} - ${type.category.name}`,
       status: product.status,
+      is_broken: is_broken,
     };
 
     return CustomResponse.success('Product purchase found!', data);
@@ -161,8 +163,9 @@ export class ProductService extends BaseService {
     type_id: string,
     store_id: string,
     weight: number,
-    is_broken: boolean,
+    is_broken: any,
   ) {
+    is_broken = is_broken === true || is_broken === 'true';
     // Get the type and Category
     const type = await this.prisma.type.findFirst({
       where: {
@@ -230,6 +233,7 @@ export class ProductService extends BaseService {
       adjustment_price: adjust * -1,
       weight: weight,
       type: `${type.code} - ${type.category.name}`,
+      is_broken: is_broken,
     };
 
     return CustomResponse.success('Product purchase found!', data);

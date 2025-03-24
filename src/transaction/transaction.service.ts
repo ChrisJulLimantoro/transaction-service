@@ -169,6 +169,7 @@ export class TransactionService extends BaseService {
         throw new Error('Product already sold');
       }
       const transactionDetail = new CreateTransactionProductRequest(data);
+      console.log('transactionDetail', transactionDetail);
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionProductRequest.schema(),
@@ -201,6 +202,8 @@ export class TransactionService extends BaseService {
       result = await this.transactionOperationRepository.create(validatedData);
     } else {
       const transactionDetail = new CreateTransactionProductRequest(data);
+      console.log('transactionDetail', transactionDetail);
+
       validatedData = this.validation.validate(
         transactionDetail,
         CreateTransactionProductRequest.schema(),
@@ -242,15 +245,23 @@ export class TransactionService extends BaseService {
       await this.transactionOperationRepository.update(id, validatedData);
       updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
-      data.total_price =
-        data.weight * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail =
         await this.transactionProductRepository.findOne(id);
+      if (
+        data.transaction_type == 2 &&
+        data.adjustment_price == transactionDetail.adjustment_price
+      ) {
+        // adjust the adjustment_price
+        const res = await this.updateAdjust(data);
+        data.adjustment_price = res * -1;
+      }
+      data.total_price =
+        data.weight * Number(data.price) + Number(data.adjustment_price);
       if (!transactionDetail) {
         return CustomResponse.error('Transaction Detail not found', null, 404);
       }
       const transactionDetailData = new CreateTransactionProductRequest(data);
-
+      console.log('transactionDetailData', transactionDetailData);
       const validatedData = this.validation.validate(
         transactionDetailData,
         CreateTransactionProductRequest.schema(),
@@ -267,9 +278,60 @@ export class TransactionService extends BaseService {
     });
   }
 
+  async updateAdjust(data: any): Promise<number> {
+    // Get transaction
+    const trans = await this.transactionRepository.findOne(data.transaction_id);
+    // Get the store
+    const store = await this.prisma.store.findFirst({
+      where: { id: trans.store_id, deleted_at: null },
+    });
+    // Get the type
+    const type = await this.prisma.type.findFirst({
+      where: { code: data.type.split(' - ')[0], deleted_at: null },
+    });
+    var newPrice = 0;
+    if (store.is_float_price || data.product_code_id == null) {
+      const price = await this.prisma.price.findFirst({
+        where: {
+          type_id: type.id,
+          date: {
+            lte: new Date(),
+          },
+          is_active: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      });
+      newPrice = Number(price.price);
+    } else {
+      // Get the product to find price
+      const product = await this.productCodeRepository.findOne(
+        data.product_code_id,
+      );
+      newPrice = product.fixed_price;
+    }
+
+    var adjust = 0;
+    if (data.is_broken) {
+      adjust =
+        Number(type.fixed_broken_reduction) > 0
+          ? Number(type.fixed_broken_reduction)
+          : (Number(type.percent_broken_reduction) * newPrice * data.weight) /
+            100;
+    } else {
+      adjust =
+        Number(type.fixed_price_reduction) > 0
+          ? Number(type.fixed_price_reduction)
+          : (Number(type.percent_price_reduction) * newPrice * data.weight) /
+            100;
+    }
+
+    return adjust;
+  }
+
   async deleteDetail(id: string): Promise<CustomResponse> {
     const product = await this.transactionProductRepository.findOne(id);
-    console.log(id);
     const operation = await this.transactionOperationRepository.findOne(id);
 
     if (!product && !operation) {
@@ -278,27 +340,28 @@ export class TransactionService extends BaseService {
 
     if (product) {
       await this.transactionProductRepository.delete(id);
-      // Update product status Locally
-      const code = await this.productCodeRepository.update(
-        product.product_code_id,
-        {
-          status:
-            product.transaction_type == 1
-              ? 0
-              : product.transaction_type == 2
-                ? 1
-                : 0,
-        },
-      );
-      console.log('code deleted', code);
-      // Broadcast the update to other services
-      this.inventoryClient.emit(
-        { cmd: 'product_code_updated' },
-        {
-          id: code.id,
-          status: code.status,
-        },
-      );
+      if (product.product_code_id != null) {
+        // Update product status Locally
+        const code = await this.productCodeRepository.update(
+          product.product_code_id,
+          {
+            status:
+              product.transaction_type == 1
+                ? 0
+                : product.transaction_type == 2
+                  ? 1
+                  : 0,
+          },
+        );
+        // Broadcast the update to other services
+        this.inventoryClient.emit(
+          { cmd: 'product_code_updated' },
+          {
+            id: code.id,
+            status: code.status,
+          },
+        );
+      }
     } else {
       await this.transactionOperationRepository.delete(id);
     }
@@ -372,21 +435,23 @@ export class TransactionService extends BaseService {
       for (const detail of transactionProduct) {
         await this.transactionProductRepository.delete(detail.id);
         // Update product status Locally
-        const code = await this.productCodeRepository.update(
-          detail.product_code_id,
-          {
-            status: detail.transaction_type == 1 ? 0 : 1,
-          },
-        );
-        console.log('code deleted', code);
-        // Broadcast the update to other services
-        this.inventoryClient.emit(
-          { cmd: 'product_code_updated' },
-          {
-            id: code.id,
-            status: code.status,
-          },
-        );
+        if (detail.product_code_id != null) {
+          const code = await this.productCodeRepository.update(
+            detail.product_code_id,
+            {
+              status: detail.transaction_type == 1 ? 0 : 1,
+            },
+          );
+          console.log('code deleted', code);
+          // Broadcast the update to other services
+          this.inventoryClient.emit(
+            { cmd: 'product_code_updated' },
+            {
+              id: code.id,
+              status: code.status,
+            },
+          );
+        }
       }
       for (const detail of transactionOperation) {
         await this.transactionOperationRepository.delete(detail.id);

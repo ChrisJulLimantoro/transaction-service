@@ -6,6 +6,7 @@ export class CreateTransactionProductRequest {
   type: string | null;
   transaction_type: number;
   weight: number;
+  is_broken: boolean;
   price: number;
   adjustment_price: number;
   discount: number;
@@ -19,6 +20,7 @@ export class CreateTransactionProductRequest {
     name,
     type,
     weight,
+    is_broken = false,
     price,
     adjustment_price,
     discount,
@@ -31,6 +33,7 @@ export class CreateTransactionProductRequest {
     this.type = type;
     this.transaction_type = parseInt(transaction_type);
     this.weight = parseFloat(weight);
+    this.is_broken = is_broken;
     this.price = parseFloat(price);
     this.adjustment_price = parseFloat(adjustment_price);
     this.discount = parseFloat(discount);
@@ -46,6 +49,7 @@ export class CreateTransactionProductRequest {
       type: z.string().nullable(),
       transaction_type: z.number(),
       weight: z.number(),
+      is_broken: z.boolean(),
       price: z.number(),
       adjustment_price: z.number(),
       discount: z.number(),
