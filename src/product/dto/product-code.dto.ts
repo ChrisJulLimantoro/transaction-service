@@ -27,7 +27,7 @@ export class ProductCodeDto {
     this.weight = parseFloat(weight);
     this.fixed_price = parseFloat(fixed_price);
     this.taken_out_at = taken_out_at ? new Date(taken_out_at) : null;
-    this.buy_price = parseFloat(buy_price);
+    this.buy_price = isNaN(parseFloat(buy_price)) ? null : parseFloat(buy_price);
   }
 
   static schema() {
@@ -39,7 +39,7 @@ export class ProductCodeDto {
       weight: z.number().optional(),
       fixed_price: z.number().optional(),
       taken_out_at: z.date().nullable().optional(),
-      buy_price: z.number().optional(),
+      buy_price: z.number().nullable().optional(),
     });
   }
 }

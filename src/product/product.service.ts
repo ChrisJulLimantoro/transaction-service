@@ -10,6 +10,7 @@ import { ProductCodeDto } from './dto/product-code.dto';
 import { PriceRepository } from 'src/repositories/price.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCode } from '@prisma/client';
+import { connect } from 'http2';
 
 @Injectable()
 export class ProductService extends BaseService {
@@ -46,10 +47,14 @@ export class ProductService extends BaseService {
 
   async updateProductCode(id: any, data: any) {
     const convert = new ProductCodeDto(data);
-    const validatedData = this.validation.validate(
+    let validatedData :any = this.validation.validate(
       convert,
       ProductCodeDto.schema(),
     );
+    if (validatedData.product_id) {
+      validatedData = { ...validatedData, product: {connect: {id: validatedData.product_id} } };
+      delete validatedData.product_id;
+    }
     const code = await this.productCodeRepository.update(id, validatedData);
     return CustomResponse.success('Product code updated!', code, 200);
   }
