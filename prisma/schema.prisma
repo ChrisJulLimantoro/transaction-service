@@ -141,6 +141,7 @@ model Store {
   poin_config    Int     @default(0)
   tax_percentage    Decimal @db.Decimal @default(11)
   balance        Decimal @default(0) @db.Decimal
+  grace_period   Int     @default(0)
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]
@@ -365,12 +366,13 @@ model Transaction {
 model TransactionProduct {
   id               String  @id @default(uuid()) @db.Uuid
   transaction_id   String  @db.Uuid
-  product_code_id  String  @db.Uuid
+  product_code_id  String?  @db.Uuid
   transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
   name             String?
   type             String?
   weight           Decimal @db.Decimal
   price            Decimal @db.Decimal
+  is_broken        Boolean @default(false)
   adjustment_price Decimal @db.Decimal
   discount         Decimal @db.Decimal @default(0)
   total_price      Decimal @db.Decimal
@@ -378,7 +380,7 @@ model TransactionProduct {
   comment          String? @db.Text
 
   transaction  Transaction @relation(fields: [transaction_id], references: [id])
-  product_code ProductCode @relation(fields: [product_code_id], references: [id])
+  product_code ProductCode? @relation(fields: [product_code_id], references: [id])
 
   created_at        DateTime           @default(now())
   updated_at        DateTime           @updatedAt

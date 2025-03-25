@@ -1,11 +1,12 @@
 import { z } from 'zod';
 export class CreateTransactionProductRequest {
   transaction_id: string;
-  product_code_id: string;
+  product_code_id: string | null;
   name: string | null;
   type: string | null;
   transaction_type: number;
   weight: number;
+  is_broken: boolean;
   price: number;
   adjustment_price: number;
   discount: number;
@@ -19,6 +20,7 @@ export class CreateTransactionProductRequest {
     name,
     type,
     weight,
+    is_broken = false,
     price,
     adjustment_price,
     discount,
@@ -31,6 +33,7 @@ export class CreateTransactionProductRequest {
     this.type = type;
     this.transaction_type = parseInt(transaction_type);
     this.weight = parseFloat(weight);
+    this.is_broken = is_broken;
     this.price = parseFloat(price);
     this.adjustment_price = parseFloat(adjustment_price);
     this.discount = parseFloat(discount);
@@ -41,11 +44,12 @@ export class CreateTransactionProductRequest {
   static schema() {
     return z.object({
       transaction_id: z.string().uuid(),
-      product_code_id: z.string().uuid(),
+      product_code_id: z.string().uuid().nullable().optional(),
       name: z.string().nullable(),
       type: z.string().nullable(),
       transaction_type: z.number(),
       weight: z.number(),
+      is_broken: z.boolean(),
       price: z.number(),
       adjustment_price: z.number(),
       discount: z.number(),

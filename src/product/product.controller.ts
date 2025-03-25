@@ -1,7 +1,14 @@
 import { Controller } from '@nestjs/common';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import {
+  Ctx,
+  EventPattern,
+  MessagePattern,
+  Payload,
+  RmqContext,
+} from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { ProductService } from './product.service';
+import { Describe } from 'src/decorator/describe.decorator';
 
 @Controller('product')
 export class ProductController {
@@ -73,6 +80,32 @@ export class ProductController {
       context,
       () => this.service.updateProductCode(data.id, data),
       'Error processing product_code_updated event',
+    );
+  }
+
+  @MessagePattern({ cmd: 'get:product-purchase/*' })
+  @Describe({
+    description: 'Get Product Purchase',
+    fe: ['transaction/purchase:add', 'transaction/purchase:edit'],
+  })
+  async getProductPurchase(@Payload() data: any) {
+    const id = data.params.id;
+    const store = data.body.auth.store_id;
+    return this.service.getProductPurchase(id, store, data.body.is_broken);
+  }
+
+  @MessagePattern({ cmd: 'get:purchase-non-product' })
+  @Describe({
+    description: 'Get Purchase Info',
+    fe: ['transaction/purchase:add', 'transaction/purchase:edit'],
+  })
+  async getPurchaseInfo(@Payload() data: any) {
+    const body = data.body;
+    return this.service.getPurchaseNonProduct(
+      body.type_id,
+      body.auth.store_id,
+      body.weight,
+      body.is_broken,
     );
   }
 }

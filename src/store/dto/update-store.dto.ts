@@ -7,6 +7,7 @@ export class UpdateStoreRequest {
   is_float_price: boolean | null;
   poin_config: number | null;
   tax_percentage: number | null;
+  grace_period: number | null;
 
   constructor({
     code,
@@ -16,6 +17,7 @@ export class UpdateStoreRequest {
     is_float_price,
     poin_config,
     tax_percentage,
+    grace_period,
   }) {
     this.code = code;
     this.name = name;
@@ -24,6 +26,7 @@ export class UpdateStoreRequest {
     this.is_float_price = is_float_price;
     this.poin_config = parseFloat(poin_config);
     this.tax_percentage = parseFloat(tax_percentage);
+    this.grace_period = parseInt(grace_period);
   }
 
   static schema() {
@@ -35,6 +38,7 @@ export class UpdateStoreRequest {
       is_float_price: z.boolean().nullable().optional(),
       poin_config: z.number().nullable().optional(),
       tax_percentage: z.number().nullable().optional(),
+      grace_period: z.number().nullable().optional(),
     });
   }
 }

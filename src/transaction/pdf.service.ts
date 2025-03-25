@@ -29,17 +29,19 @@ export class PdfService {
 
     await Promise.all(
       transaction.transaction_products.map(async (item) => {
-        console.log(item.name.split(' - ')[0] + ';' + item.product_code_id);
-        item.qr = await this.generateQRCode(
-          item.name.split(' - ')[0] + ';' + item.product_code_id,
-        );
+        if (item.product_code_id != null) {
+          item.qr = await this.generateQRCode(
+            item.name.split(' - ')[0] + ';' + item.product_code_id,
+          );
+        } else {
+          item.qr = null;
+        }
       }),
     );
 
     // Process transaction operations
     await Promise.all(
       transaction.transaction_operations.map(async (item) => {
-        console.log(item.name.split(' - ')[0] + ';' + item.operation_id);
         item.qr = await this.generateQRCode(
           item.name.split(' - ')[0] + ';' + item.operation_id,
         );
@@ -51,7 +53,7 @@ export class PdfService {
       Number(transaction.tax_price) -
       Number(transaction.total_price);
 
-    const htmlContent = `
+    var htmlContent = `
     <!doctype html>
     <html lang="en">
     <head>
@@ -108,6 +110,9 @@ export class PdfService {
             padding: 10px;
             font-size: 12px;
             text-align: left;
+            // word-break: break-word;
+            // white-space: normal;
+            // overflow-wrap: break-word;
         }
         .table th {
             background-color: #f4f4f4;
@@ -138,6 +143,7 @@ export class PdfService {
         <div class="header">
             <div>
                 <div class="title">#${transaction.code}</div>
+                <div class="title">${transaction.transaction_type == 1 ? 'Sales' : 'Purchase'}</div>
                 <!-- Order Details -->
                 <div class="order-details">
                     <div><strong>Order Date:</strong> ${this.formatDate(transaction.date)}</div>
@@ -168,6 +174,7 @@ export class PdfService {
             <tr>
                 <th width="15%">Code</th>
                 <th>Barang</th>
+                <th>Kategori</th>
                 <th>Quantity</th>
                 <th><div class="right">Subtotal</div></th>
             </tr>
@@ -176,13 +183,19 @@ export class PdfService {
                 <tbody>
                 ${transaction.transaction_products
                   .map(
-                    (item) => `            
+                    (item) =>
+                      `            
                 <tr>
-                    <td><div class="item-code">
-                    <img src="${item.qr}" width="50" height="50" />
-                    <i>${item.name.split(' - ')[0]}</i>
-                    </div></td>
-                    <td>${item.name.split(' - ')[1]}</td>
+                    <td>
+                    <div class="item-code">` +
+                      (item.qr != null
+                        ? `<img src="${item.qr}" width="50" height="50" />`
+                        : '') +
+                      `<i>${item.name.split(' - ')[0]}</i>
+                    </div>
+                    </td>
+                    <td>${item.name.split(' - ')[1] ?? 'Outside Product'}</td>
+                    <td>${item.type}</td>
                     <td>${item.weight} gr</td>
                     <td><div class="right">${this.formatCurrency(item.total_price)}</div></td>
                 </tr>`,
@@ -208,11 +221,13 @@ export class PdfService {
 
         <!-- Total Section -->
         <div class="total-section">
-            <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>
-            <div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>
+            <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>`;
+    if (transaction.transaction_type == 1) {
+      htmlContent += `<div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>
             <div>Poin Earned: <strong>${transaction.poin_earned}</strong></div>
-            <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>
-            <hr />
+            <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>`;
+    }
+    htmlContent += `<hr />
             <div><strong>Total: ${this.formatCurrency(transaction.total_price)}</strong></div>
         </div>
 
