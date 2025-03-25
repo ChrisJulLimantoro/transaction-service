@@ -83,6 +83,7 @@ model ProductCode {
   fixed_price    Decimal @db.Decimal
   status        Int // 0: Available 1: Sold Out 2: Taken
   taken_out_at  DateTime?
+  buy_price    Decimal   @default(0) @db.Decimal
 
   product              Product              @relation(fields: [product_id], references: [id])
   transaction_products TransactionProduct[]

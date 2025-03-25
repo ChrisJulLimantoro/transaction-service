@@ -188,6 +188,7 @@ export class TransactionController {
       newstatus,
     );
     if (res.success) {
+      console.log('res di trans acpprove sales', res.data.transaction_products[0]);
       this.financeClient.emit({ cmd: 'sales_approved' }, res);
     }
     return res;
