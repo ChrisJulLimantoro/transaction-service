@@ -8,6 +8,7 @@ export class ProductCodeDto {
   weight: number;
   fixed_price: number;
   taken_out_at: Date;
+  buy_price: number;
 
   constructor({
     id,
@@ -17,6 +18,7 @@ export class ProductCodeDto {
     weight,
     fixed_price,
     taken_out_at,
+    buy_price,
   }) {
     this.id = id;
     this.barcode = barcode;
@@ -25,6 +27,7 @@ export class ProductCodeDto {
     this.weight = parseFloat(weight);
     this.fixed_price = parseFloat(fixed_price);
     this.taken_out_at = taken_out_at ? new Date(taken_out_at) : null;
+    this.buy_price = isNaN(parseFloat(buy_price)) ? null : parseFloat(buy_price);
   }
 
   static schema() {
@@ -36,6 +39,7 @@ export class ProductCodeDto {
       weight: z.number().optional(),
       fixed_price: z.number().optional(),
       taken_out_at: z.date().nullable().optional(),
+      buy_price: z.number().nullable().optional(),
     });
   }
 }

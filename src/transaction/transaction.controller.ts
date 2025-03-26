@@ -124,6 +124,7 @@ export class TransactionController {
     ],
   })
   async createTransaction(@Payload() data: any) {
+    console.log('data body transaction purchase', data.body);
     const response = await this.transactionService.create(data.body);
     if (response.success) {
       this.marketplaceClient.emit('transaction_operational_created', response);
@@ -261,7 +262,8 @@ export class TransactionController {
       newstatus,
     );
     if (res.success) {
-      this.financeClient.emit({ cmd: 'sales_approved' }, res);
+      console.log('res di trans acpprove sales', res.data.transaction_products[0]);
+      this.financeClient.emit({ cmd: 'transaction_approved' }, res);
     }
     return res;
   }
@@ -300,7 +302,7 @@ export class TransactionController {
       newstatus,
     );
     if (res.success) {
-      this.financeClient.emit({ cmd: 'sales_disapproved' }, res);
+      this.financeClient.emit({ cmd: 'transaction_disapproved' }, res);
     }
     return res;
   }

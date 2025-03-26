@@ -10,6 +10,7 @@ export class UpdateTransactionRequest {
   adjustment_price: number | null;
   total_price: number | null;
   status: number | null;
+  account_id: string | null;
 
   constructor({
     date,
@@ -22,6 +23,7 @@ export class UpdateTransactionRequest {
     adjustment_price,
     total_price,
     status,
+    account_id
   }) {
     this.date = new Date(date);
     this.customer_id = customer_id;
@@ -33,6 +35,7 @@ export class UpdateTransactionRequest {
     this.adjustment_price = parseFloat(adjustment_price ?? 0);
     this.total_price = parseFloat(total_price);
     this.status = parseInt(status);
+    this.account_id = account_id
   }
 
   static schema() {
@@ -47,6 +50,7 @@ export class UpdateTransactionRequest {
       adjustment_price: z.number().nullable().optional(),
       total_price: z.number().nullable().optional(),
       status: z.number().nullable().optional(),
+      account_id: z.string().uuid().nullable().optional(),
     });
   }
 }

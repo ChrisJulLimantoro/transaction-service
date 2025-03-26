@@ -40,6 +40,8 @@ $ npm run start
 
 # watch mode
 $ npm run start:dev
+# Kill run service
+$ npx kill-port 3000
 
 # production mode
 $ npm run start:prod
