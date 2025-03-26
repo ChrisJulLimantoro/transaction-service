@@ -14,6 +14,7 @@ export class CreateTransactionRequest {
   tax_price: number;
   total_price: number;
   comment: string | null;
+  account_id: string | null;
   transaction_details: [];
 
   constructor({
@@ -32,6 +33,7 @@ export class CreateTransactionRequest {
     total_price,
     comment,
     transaction_details,
+    account_id
   }) {
     this.date = new Date(date);
     this.customer_id = customer_id;
@@ -48,6 +50,7 @@ export class CreateTransactionRequest {
     this.total_price = parseFloat(total_price);
     this.comment = comment;
     this.transaction_details = transaction_details;
+    this.account_id = account_id;
   }
 
   static schema() {
@@ -66,6 +69,7 @@ export class CreateTransactionRequest {
       tax_price: z.number(),
       total_price: z.number(),
       comment: z.string().nullable().optional(),
+      account_id: z.string().uuid().nullable().optional(),
     });
   }
 }

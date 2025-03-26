@@ -6,6 +6,7 @@ export class UpdateTransactionRequest {
   payment_method: number | null;
   paid_amount: number | null;
   status: number | null;
+  account_id: string | null;
 
   constructor({
     date,
@@ -14,6 +15,7 @@ export class UpdateTransactionRequest {
     payment_method,
     paid_amount,
     status,
+    account_id
   }) {
     this.date = new Date(date);
     this.customer_id = customer_id;
@@ -21,6 +23,7 @@ export class UpdateTransactionRequest {
     this.payment_method = parseInt(payment_method);
     this.paid_amount = parseFloat(paid_amount);
     this.status = parseInt(status);
+    this.account_id = account_id
   }
 
   static schema() {
@@ -31,6 +34,7 @@ export class UpdateTransactionRequest {
       payment_method: z.number().nullable().optional(),
       paid_amount: z.number().min(0).nullable().optional(),
       status: z.number().nullable().optional(),
+      account_id: z.string().uuid().nullable().optional(),
     });
   }
 }

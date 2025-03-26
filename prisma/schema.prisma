@@ -213,6 +213,7 @@ model Account {
   store     Store?      @relation(fields: [store_id], references: [id])
   company   Company     @relation(fields: [company_id], references: [id])
   operation Operation[]
+  transaction Transaction[]
 
   @@index([deleted_at])
   @@index([company_id])
@@ -344,7 +345,8 @@ model Transaction {
   customer_id      String    @db.Uuid
   voucher_own_id   String?   @db.Uuid
   employee_id      String?   @db.Uuid
-  nota_link         String?
+  nota_link        String?
+  account_id       String?   @db.Uuid // Purchase from customer bayar pake akun apa
 
   store                  Store                  @relation(fields: [store_id], references: [id])
   customer               Customer               @relation(fields: [customer_id], references: [id])
@@ -352,6 +354,7 @@ model Transaction {
   employee               User?                  @relation(fields: [employee_id], references: [id])
   transaction_products   TransactionProduct[]
   transaction_operations TransactionOperation[]
+  account Account? @relation(fields: [account_id], references: [id])
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
