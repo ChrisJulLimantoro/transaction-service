@@ -41,7 +41,6 @@ export class TransactionController {
       { date: 'desc' },
       search,
     );
-    console.log(response.data.data);
     return response;
   }
 
@@ -60,7 +59,24 @@ export class TransactionController {
       { date: 'desc' },
       search,
     );
-    console.log(response.data.data);
+    return response;
+  }
+
+  @MessagePattern({ cmd: 'get:trade' })
+  @Describe({
+    description: 'Get All Trade',
+    fe: ['transaction/trade:open'],
+  })
+  async getTrade(@Payload() data: any) {
+    const filter = { store_id: data.body.auth.store_id, transaction_type: 3 };
+    const { page, limit, sort, search } = data.body;
+    const response = await this.transactionService.findAll(
+      filter,
+      page,
+      limit,
+      { date: 'desc' },
+      search,
+    );
     return response;
   }
 
@@ -72,6 +88,8 @@ export class TransactionController {
       'transaction/sales:detail',
       'transaction/purchase:edit',
       'transaction/purchase:detail',
+      'transaction/trade:edit',
+      'transaction/trade:detail',
     ],
   })
   async getTransactionById(@Payload() data: any) {
@@ -87,6 +105,8 @@ export class TransactionController {
       'transaction/sales:edit',
       'transaction/purchase:detail',
       'transaction/purchase:edit',
+      'transaction/trade:edit',
+      'transaction/trade:detail',
     ],
   })
   async getTransactionNota(@Payload() data: any) {
@@ -97,7 +117,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'post:transaction' })
   @Describe({
     description: 'Create Transaction',
-    fe: ['transaction/sales:add', 'transaction/purchase:add'],
+    fe: [
+      'transaction/sales:add',
+      'transaction/purchase:add',
+      'transaction/trade:add',
+    ],
   })
   async createTransaction(@Payload() data: any) {
     const response = await this.transactionService.create(data.body);
@@ -110,7 +134,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'post:transaction-detail' })
   @Describe({
     description: 'Create Transaction Detail',
-    fe: ['transaction/sales:edit', 'transaction/purchase:edit'],
+    fe: [
+      'transaction/sales:edit',
+      'transaction/purchase:edit',
+      'transaction/trade:edit',
+    ],
   })
   async createTransactionDetail(@Payload() data: any) {
     const response = await this.transactionService.createDetail(data.body);
@@ -123,7 +151,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction/*' })
   @Describe({
     description: 'Update Transaction',
-    fe: ['transaction/sales:edit', 'transaction/purchase:edit'],
+    fe: [
+      'transaction/sales:edit',
+      'transaction/purchase:edit',
+      'transaction/trade:edit',
+    ],
   })
   async updateTransaction(@Payload() data: any) {
     const id = data.params.id;
@@ -141,7 +173,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction-detail/*' })
   @Describe({
     description: 'Update Transaction Detail',
-    fe: ['transaction/sales:edit', 'transaction/purchase:edit'],
+    fe: [
+      'transaction/sales:edit',
+      'transaction/purchase:edit',
+      'transaction/trade:edit',
+    ],
   })
   async updateTransactionDetail(@Payload() data: any) {
     const id = data.params.id;
@@ -156,7 +192,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'delete:transaction/*' })
   @Describe({
     description: 'Delete Transaction',
-    fe: ['transaction/sales:delete', 'transaction/purchase:delete'],
+    fe: [
+      'transaction/sales:delete',
+      'transaction/purchase:delete',
+      'transaction/trade:delete',
+    ],
   })
   async deleteTransaction(@Payload() data: any) {
     const id = data.params.id;
@@ -170,7 +210,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'delete:transaction-detail/*' })
   @Describe({
     description: 'Delete Transaction Detail',
-    fe: ['transaction/sales:edit', 'transaction/purchase:edit'],
+    fe: [
+      'transaction/sales:edit',
+      'transaction/purchase:edit',
+      'transaction/trade:edit',
+    ],
   })
   async deleteTransactionDetail(@Payload() data: any) {
     const id = data.params.id;
@@ -187,7 +231,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction-approve/*' })
   @Describe({
     description: 'Transaction Approve',
-    fe: ['transaction/sales:approve', 'transaction/purchase:approve'],
+    fe: [
+      'transaction/sales:approve',
+      'transaction/purchase:approve',
+      'transaction/trade:approve',
+    ],
   })
   async transactionApprove(@Payload() data: any) {
     var newdata = data.body;
@@ -221,7 +269,11 @@ export class TransactionController {
   @MessagePattern({ cmd: 'put:transaction-disapprove/*' })
   @Describe({
     description: 'Transaction Disapprove',
-    fe: ['transaction/sales:disapprove', 'transaction/purchase:disapprove'],
+    fe: [
+      'transaction/sales:disapprove',
+      'transaction/purchase:disapprove',
+      'transaction/trade:disapprove',
+    ],
   })
   async transactionDisapprove(@Payload() data: any) {
     var newdata = data.body;

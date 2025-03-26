@@ -5,6 +5,10 @@ export class UpdateTransactionRequest {
   employee_id: string | null;
   payment_method: number | null;
   paid_amount: number | null;
+  tax_percent: number | null;
+  tax_price: number | null;
+  adjustment_price: number | null;
+  total_price: number | null;
   status: number | null;
 
   constructor({
@@ -13,6 +17,10 @@ export class UpdateTransactionRequest {
     employee_id,
     payment_method,
     paid_amount,
+    tax_percent,
+    tax_price,
+    adjustment_price,
+    total_price,
     status,
   }) {
     this.date = new Date(date);
@@ -20,6 +28,10 @@ export class UpdateTransactionRequest {
     this.employee_id = employee_id;
     this.payment_method = parseInt(payment_method);
     this.paid_amount = parseFloat(paid_amount);
+    this.tax_percent = parseFloat(tax_percent);
+    this.tax_price = parseFloat(tax_price);
+    this.adjustment_price = parseFloat(adjustment_price ?? 0);
+    this.total_price = parseFloat(total_price);
     this.status = parseInt(status);
   }
 
@@ -29,7 +41,11 @@ export class UpdateTransactionRequest {
       customer_id: z.string().nullable().optional(),
       employee_id: z.string().nullable().optional(),
       payment_method: z.number().nullable().optional(),
-      paid_amount: z.number().min(0).nullable().optional(),
+      paid_amount: z.number().nullable().optional(),
+      tax_percent: z.number().min(0).nullable().optional(),
+      tax_price: z.number().nullable().optional(),
+      adjustment_price: z.number().nullable().optional(),
+      total_price: z.number().nullable().optional(),
       status: z.number().nullable().optional(),
     });
   }

@@ -12,8 +12,9 @@ export class BaseRepository<T> {
   ) {}
 
   // Create a new record with possible relations
-  async create(data: any): Promise<T> {
-    return this.prisma[this.modelName].create({
+  async create(data: any, tx?: Prisma.TransactionClient): Promise<T> {
+    const prismaClient = tx ?? this.prisma;
+    return prismaClient[this.modelName].create({
       data,
       include: this.relations,
     });
@@ -26,12 +27,14 @@ export class BaseRepository<T> {
     limit?: number,
     sort?: Record<string, 'asc' | 'desc'>,
     search?: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<{
     data: any[];
     total?: number;
     page?: number;
     totalPages?: number;
   }> {
+    const prismaClient = tx ?? this.prisma;
     const fields = (await this.getModelFields()).filter(
       (field) => !field.name.includes('id'),
     );
@@ -50,7 +53,6 @@ export class BaseRepository<T> {
         }
       : {};
 
-    // Ensure correct WHERE structure: deleted_at IS NULL AND (OR conditions)
     const whereConditions = {
       AND: {
         ...(this.isSoftDelete
@@ -61,31 +63,25 @@ export class BaseRepository<T> {
       },
     };
 
-    // console.log(whereConditions, whereConditions["AND"]["OR"]);
-
-    // Apply sorting
     const orderBy = sort
       ? Object.entries(sort).map(([key, value]) => ({
           [key]: value,
         }))
       : undefined;
 
-    // If page & limit are not provided, return all records (no pagination)
     if (!page || !limit || page === 0 || limit === 0) {
-      const data = await this.prisma[this.modelName].findMany({
+      const data = await prismaClient[this.modelName].findMany({
         where: whereConditions,
         include: this.relations,
       });
-      return { data }; // No pagination metadata
+      return { data };
     }
 
-    // Get total count before applying pagination
-    const total = await this.prisma[this.modelName].count({
+    const total = await prismaClient[this.modelName].count({
       where: whereConditions,
     });
 
-    // Fetch paginated records
-    const data = await this.prisma[this.modelName].findMany({
+    const data = await prismaClient[this.modelName].findMany({
       where: whereConditions,
       include: this.relations,
       skip: (page - 1) * limit,
@@ -102,22 +98,32 @@ export class BaseRepository<T> {
   }
 
   // Find a record by ID with possible relations and filter criteria
-  async findOne(id: string, filter?: Record<string, any>): Promise<T | null> {
+  async findOne(
+    id: string,
+    filter?: Record<string, any>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<T | null> {
+    const prismaClient = tx ?? this.prisma;
     const whereConditions: Record<string, any> = {
       ...(this.isSoftDelete ? { id, deleted_at: null } : { id }),
-      ...filter, // Add the provided filter conditions
+      ...filter,
     };
 
-    return this.prisma[this.modelName].findUnique({
-      where: whereConditions, // Apply dynamic filter along with soft delete condition
+    return prismaClient[this.modelName].findUnique({
+      where: whereConditions,
       include: this.relations,
     });
   }
 
   // Update a record with possible relations
-  async update(id: string, data: any): Promise<T> {
+  async update(
+    id: string,
+    data: any,
+    tx?: Prisma.TransactionClient,
+  ): Promise<T> {
+    const prismaClient = tx ?? this.prisma;
     data.updated_at = new Date();
-    return this.prisma[this.modelName].update({
+    return prismaClient[this.modelName].update({
       where: this.isSoftDelete ? { id, deleted_at: null } : { id },
       data,
       include: this.relations,
@@ -125,45 +131,50 @@ export class BaseRepository<T> {
   }
 
   // Delete a record by ID
-  async delete(id: string): Promise<T> {
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<T> {
+    const prismaClient = tx ?? this.prisma;
     if (this.isSoftDelete) {
-      return this.prisma[this.modelName].update({
+      return prismaClient[this.modelName].update({
         where: { id },
         data: { deleted_at: new Date(), updated_at: new Date() },
       });
     }
-    return this.prisma[this.modelName].delete({
+    return prismaClient[this.modelName].delete({
       where: { id },
     });
   }
 
   // Restore a soft deleted record
-  async restore(id: string): Promise<T> {
-    return this.prisma[this.modelName].update({
+  async restore(id: string, tx?: Prisma.TransactionClient): Promise<T> {
+    const prismaClient = tx ?? this.prisma;
+    return prismaClient[this.modelName].update({
       where: { id },
       data: { deleted_at: null, updated_at: new Date() },
     });
   }
 
-  // function for count
-  async count(filter?: Record<string, any>): Promise<number> {
-    console.log(this.modelName, filter);
-    return this.prisma[this.modelName].count({
+  // Function for count
+  async count(
+    filter?: Record<string, any>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    const prismaClient = tx ?? this.prisma;
+    return prismaClient[this.modelName].count({
       where: filter,
     });
   }
 
-  async sync(data: any[]) {
-    const datas = await Promise.all(
+  async sync(data: any[], tx?: Prisma.TransactionClient) {
+    const prismaClient = tx ?? this.prisma;
+    return await Promise.all(
       data.map((d) =>
-        this.prisma[this.modelName].upsert({
+        prismaClient[this.modelName].upsert({
           where: { id: d.id },
           update: d,
           create: d,
-        })
-      )
+        }),
+      ),
     );
-    return datas;
   }
 
   async getModelFields(): Promise<Record<string, string>[]> {

@@ -94,7 +94,6 @@ export class TransactionService extends BaseService {
       transactionDetails.push({
         ...detail,
         transaction_id: transaction.id,
-        transaction_type: transaction.transaction_type,
         weight: detail.quantity,
         unit: detail.quantity,
         status: 1,
@@ -154,7 +153,6 @@ export class TransactionService extends BaseService {
     }
     var validatedData = null;
     var result = null;
-    data.transaction_type = transaction.transaction_type;
     data.status = transaction.status == 2 ? 2 : 1;
     if (data.detail_type == 'product' && data.product_code_id != null) {
       // Check if item available
@@ -167,6 +165,9 @@ export class TransactionService extends BaseService {
       }
       if (product.status != 0 && transaction.transaction_type == 1) {
         throw new Error('Product already sold');
+      }
+      if (product.status != 1 && transaction.transaction_type == 2) {
+        throw new Error('Product already not available to be bought back');
       }
       const transactionDetail = new CreateTransactionProductRequest(data);
       console.log('transactionDetail', transactionDetail);
@@ -256,7 +257,8 @@ export class TransactionService extends BaseService {
         data.adjustment_price = res * -1;
       }
       data.total_price =
-        data.weight * Number(data.price) + Number(data.adjustment_price);
+        (data.weight * Number(data.price) + Number(data.adjustment_price)) *
+        (data.transaction_type == 2 ? -1 : 1);
       if (!transactionDetail) {
         return CustomResponse.error('Transaction Detail not found', null, 404);
       }
@@ -339,6 +341,9 @@ export class TransactionService extends BaseService {
     }
 
     if (product) {
+      if (product.product_code.status == 2 && product.transaction_type == 1) {
+        return CustomResponse.error('Product Already bought back', null, 400);
+      }
       await this.transactionProductRepository.delete(id);
       if (product.product_code_id != null) {
         // Update product status Locally
@@ -377,6 +382,11 @@ export class TransactionService extends BaseService {
   }
 
   async syncDetail(transaction_id: string) {
+    // Get Transaction
+    const transaction = await this.repository.findOne(transaction_id);
+    if (!transaction) {
+      return CustomResponse.error('Transaction not found', null, 404);
+    }
     // Calculate for price and responsibility
     const operations = await this.transactionOperationRepository.findAll({
       transaction_id: transaction_id,
@@ -386,28 +396,40 @@ export class TransactionService extends BaseService {
     });
 
     let subtotal = 0;
+    let subtotalSales = 0;
     let tax = null;
     for (const operation of operations.data) {
       subtotal +=
         operation.unit * operation.price +
         parseFloat(operation.adjustment_price);
+      subtotalSales += subtotal;
       if (tax == null) {
-        tax = parseFloat(operation.transaction.store.tax_percentage);
+        tax = parseFloat(operation.transaction.tax_percent);
       }
     }
     for (const product of products.data) {
+      let suffix = 1;
+      if (product.transaction_type == 2) {
+        suffix = -1;
+      }
       subtotal +=
-        product.weight * product.price + parseFloat(product.adjustment_price);
+        (product.weight * product.price +
+          parseFloat(product.adjustment_price)) *
+        suffix;
       if (tax == null && product.transaction_type == 1) {
-        tax = parseFloat(product.transaction.store.tax_percentage);
+        tax = parseFloat(product.transaction.tax_percent);
+        subtotalSales += product.weight * product.price;
       }
     }
 
     const updateData = {
       sub_total_price: subtotal,
-      tax_price: subtotal * (tax / 100),
-      total_price: subtotal * ((tax + 100) / 100),
-      paid_amount: subtotal * ((tax + 100) / 100),
+      tax_price: subtotalSales * (tax / 100),
+      total_price:
+        subtotal +
+        subtotalSales * (tax / 100) +
+        parseFloat(transaction.adjustment_price),
+      paid_amount: subtotal + subtotalSales * (tax / 100),
     };
     const res = await this.transactionRepository.update(
       transaction_id,
@@ -424,6 +446,7 @@ export class TransactionService extends BaseService {
 
     const transactionProduct = await this.prisma.transactionProduct.findMany({
       where: { transaction_id: id },
+      include: { product_code: true },
     });
 
     const transactionOperation =
@@ -432,33 +455,49 @@ export class TransactionService extends BaseService {
       });
 
     try {
-      for (const detail of transactionProduct) {
-        await this.transactionProductRepository.delete(detail.id);
-        // Update product status Locally
-        if (detail.product_code_id != null) {
-          const code = await this.productCodeRepository.update(
-            detail.product_code_id,
-            {
-              status: detail.transaction_type == 1 ? 0 : 1,
-            },
-          );
-          console.log('code deleted', code);
-          // Broadcast the update to other services
-          this.inventoryClient.emit(
-            { cmd: 'product_code_updated' },
-            {
-              id: code.id,
-              status: code.status,
-            },
-          );
-        }
-      }
-      for (const detail of transactionOperation) {
-        await this.transactionOperationRepository.delete(detail.id);
-      }
-      const dataDeleted = await this.repository.delete(id);
+      const dataDeleted = await this.prisma.$transaction(async (tx) => {
+        for (const detail of transactionProduct) {
+          if (
+            detail.product_code != null &&
+            detail.product_code.status == 2 &&
+            transaction.transaction_type == 1
+          ) {
+            throw new Error(
+              'Product Already bought back, failed to delete transaction!',
+            );
+          }
 
-      // Delete File Nota
+          await this.transactionProductRepository.delete(detail.id, tx);
+
+          if (detail.product_code_id != null) {
+            const code = await this.productCodeRepository.update(
+              detail.product_code_id,
+              {
+                status: detail.transaction_type == 1 ? 0 : 1,
+              },
+              tx,
+            );
+            console.log('code deleted', code);
+
+            // Broadcast update after transaction commits
+            this.inventoryClient.emit(
+              { cmd: 'product_code_updated' },
+              {
+                id: code.id,
+                status: code.status,
+              },
+            );
+          }
+        }
+
+        for (const detail of transactionOperation) {
+          await this.transactionOperationRepository.delete(detail.id, tx);
+        }
+
+        return await this.repository.delete(id, tx);
+      });
+
+      // PUT it Outside of transaction
       if (transaction.nota_link != null) {
         const filePath = path.join(
           this.storagePath,
@@ -478,7 +517,8 @@ export class TransactionService extends BaseService {
         dataDeleted,
       );
     } catch (error) {
-      return CustomResponse.error('Failed to delete transaction', null, 500);
+      console.error('Failed to delete transaction:', error);
+      return CustomResponse.error(error.message, null, 500);
     }
   }
 
@@ -538,7 +578,6 @@ export class TransactionService extends BaseService {
   // MarketPlace Transaction
   async processMidtransNotification(query: any): Promise<any> {
     try {
-      console.log('Notification received from Midtrans:', query);
       const { transaction_status, order_id } = query;
 
       const transaction = await this.prisma.transaction.findUnique({

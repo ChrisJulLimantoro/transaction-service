@@ -141,6 +141,11 @@ model Store {
   tax_percentage    Decimal @db.Decimal @default(11)
   balance        Decimal @default(0) @db.Decimal
   grace_period   Int     @default(0)
+  percent_tt_adjustment Decimal @default(0) @db.Decimal
+  fixed_tt_adjustment  Decimal @default(0) @db.Decimal
+  percent_kbl_adjustment Decimal @default(0) @db.Decimal
+  fixed_kbl_adjustment  Decimal @default(0) @db.Decimal
+  logo           String?
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]
@@ -336,7 +341,9 @@ model Transaction {
   expired_at       DateTime? // Expired payment link
   status           Int // 0: Draft/Pending, 1: Paid, 2: Done, -1: Cancelled
   sub_total_price  Decimal   @db.Decimal
+  tax_percent      Decimal   @default(1.1) @db.Decimal
   tax_price        Decimal   @db.Decimal
+  adjustment_price Decimal   @db.Decimal @default(0)
   total_price      Decimal   @db.Decimal
   comment          String?   @db.Text
   store_id         String    @db.Uuid
