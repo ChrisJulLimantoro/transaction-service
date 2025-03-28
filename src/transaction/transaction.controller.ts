@@ -3,6 +3,7 @@ import {
   ClientProxy,
   ClientProxyFactory,
   Ctx,
+  EventPattern,
   MessagePattern,
   Payload,
   RmqContext,
@@ -80,6 +81,46 @@ export class TransactionController {
     return response;
   }
 
+  @MessagePattern({ cmd: 'get:transproduct/*' })
+  @Describe({
+    description: 'Get All Purchase or Trade Product',
+    fe: ['inventory/product:open', 'inventory/product:edit'],
+  })
+  async getPurSales(@Payload() data: any) {
+    const response = await this.transactionService.findTransProduct(data.params.id);
+    return response;
+
+  }
+
+  @MessagePattern({ cmd: 'get:transproduct-notset' })
+  @Describe({
+    description: 'Get All Purchase or Trade Product Not Set',
+    fe: ['inventory/product:open', 'inventory/product:edit'],
+  })
+  async getPurSalesNotSet(@Payload() data: any) {
+    let filters = {};
+    if (data.body.type) {
+      filters['type'] = decodeURIComponent(data.body.type);
+    }
+    if (data.body.id) {
+      filters['id'] = data.body.id;
+    }
+    const response = await this.transactionService.findProductNotSet(filters);
+    return response;
+  }
+
+  // @EventPattern({ cmd: 'transproduct_notset' })
+  // @Exempt()
+  // async updatePurSalesNotSet(@Payload() data: any) {
+  //   console.log('data transproduct not set', data);
+  //   const id = data.transref_id;
+  //   const body = {
+  //     product_code_id: data.product_code_id,
+  //   };
+  //   const response = await this.transactionService.updateProductNotSet(id, body);
+  //   return response;
+  // }
+
   @MessagePattern({ cmd: 'get:transaction/*' })
   @Describe({
     description: 'Get Transaction By ID',
@@ -142,6 +183,7 @@ export class TransactionController {
     ],
   })
   async createTransactionDetail(@Payload() data: any) {
+    console.log('data body transaction detail', data.body);
     const response = await this.transactionService.createDetail(data.body);
     if (response) {
       this.marketplaceClient.emit('transaction_product_created', response.data);

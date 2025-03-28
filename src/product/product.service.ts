@@ -11,6 +11,7 @@ import { PriceRepository } from 'src/repositories/price.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCode } from '@prisma/client';
 import { connect } from 'http2';
+import { TransactionService } from 'src/transaction/transaction.service';
 
 @Injectable()
 export class ProductService extends BaseService {
@@ -21,6 +22,7 @@ export class ProductService extends BaseService {
   constructor(
     private readonly productRepository: ProductRepository,
     private readonly productCodeRepository: ProductCodeRepository,
+    private readonly transactionService: TransactionService,
     private readonly prisma: PrismaService,
     protected readonly validation: ValidationService,
   ) {
@@ -42,6 +44,12 @@ export class ProductService extends BaseService {
       ProductCodeDto.schema(),
     );
     const code = await this.productCodeRepository.create(validatedData);
+    console.log('genproduct code in transaction', data);
+    if (data.transref_id) {
+      await this.transactionService.updateProductNotSet(data.transref_id, {
+        product_code_id: code.id,
+      });
+    }
     return CustomResponse.success('Product code generated!', code, 201);
   }
 
