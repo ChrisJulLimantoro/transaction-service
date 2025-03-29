@@ -590,6 +590,19 @@ export class TransactionService extends BaseService {
     return CustomResponse.success('Successfully fetch product code not set', productCodes);
   }
 
+  async deleteProductCode(id: string) {
+    const transactionProduct = await this.transactionProductRepository.findAll({
+        product_code_id: id,
+        transaction_type: {in: [2, 3]},
+    })
+
+    if (transactionProduct?.data?.length > 0) {
+      const updated  = await this.transactionProductRepository.update(transactionProduct.data[0].id, {product_code_id: null});
+      return CustomResponse.success('Successfully delete product code bought from customer', updated);
+    }
+    return CustomResponse.success('Successfully delete product code', transactionProduct);
+  }
+
   // Get Product Code not Set for generate code
   // id -> transref_id (transProd.id)
   // data -> product_code_id

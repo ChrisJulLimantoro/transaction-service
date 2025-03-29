@@ -67,6 +67,15 @@ export class ProductService extends BaseService {
     return CustomResponse.success('Product code updated!', code, 200);
   }
 
+  async deleteProductCode(id: any) {
+    const code = await this.productCodeRepository.findOne(id);
+    if (!code) {
+      return CustomResponse.error('Product code not found!', 404);
+    }
+    const delProductCode = await this.transactionService.deleteProductCode(id);
+    return CustomResponse.success('Product code deleted!', code, 200);
+  }
+
   async getProductPurchase(code: string, store_id: string, is_broken: any) {
     is_broken = is_broken === true || is_broken === 'true';
     const product = (await this.productCodeRepository.findCode(code)) as any;
