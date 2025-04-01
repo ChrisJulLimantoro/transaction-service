@@ -78,10 +78,12 @@ export class ProductService extends BaseService {
 
   async getProductPurchase(code: string, store_id: string, is_broken: any) {
     is_broken = is_broken === true || is_broken === 'true';
+    // console.log('barcode purchase', code);
     const product = (await this.productCodeRepository.findCode(code)) as any;
     if (!product) {
       return CustomResponse.error('Product not found!', 404);
     }
+    // console.log('product purchase', product);
     if (product.status !== 1) {
       return CustomResponse.error('Product is not sold yet!', 400);
     }
@@ -139,6 +141,7 @@ export class ProductService extends BaseService {
       newPrice = Number(product.fixed_price);
     }
 
+    // console.log('updated_at prodct',product.transaction_products);
     var diff = Math.abs(
       Math.floor(
         (Date.parse(product.transaction_products[0].updated_at) - Date.now()) /
