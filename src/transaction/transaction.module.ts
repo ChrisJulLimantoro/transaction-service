@@ -21,5 +21,6 @@ import { PdfService } from './pdf.service';
   ],
   controllers: [TransactionController],
   imports: [SharedModule],
+  exports: [TransactionService],
 })
 export class TransactionModule {}

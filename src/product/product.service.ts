@@ -11,6 +11,7 @@ import { PriceRepository } from 'src/repositories/price.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCode } from '@prisma/client';
 import { connect } from 'http2';
+import { TransactionService } from 'src/transaction/transaction.service';
 
 @Injectable()
 export class ProductService extends BaseService {
@@ -21,6 +22,7 @@ export class ProductService extends BaseService {
   constructor(
     private readonly productRepository: ProductRepository,
     private readonly productCodeRepository: ProductCodeRepository,
+    private readonly transactionService: TransactionService,
     private readonly prisma: PrismaService,
     protected readonly validation: ValidationService,
   ) {
@@ -42,6 +44,12 @@ export class ProductService extends BaseService {
       ProductCodeDto.schema(),
     );
     const code = await this.productCodeRepository.create(validatedData);
+    console.log('genproduct code in transaction', data);
+    if (data.transref_id) {
+      await this.transactionService.updateProductNotSet(data.transref_id, {
+        product_code_id: code.id,
+      });
+    }
     return CustomResponse.success('Product code generated!', code, 201);
   }
 
@@ -59,12 +67,23 @@ export class ProductService extends BaseService {
     return CustomResponse.success('Product code updated!', code, 200);
   }
 
+  async deleteProductCode(id: any) {
+    const code = await this.productCodeRepository.findOne(id);
+    if (!code) {
+      return CustomResponse.error('Product code not found!', 404);
+    }
+    const delProductCode = await this.transactionService.deleteProductCode(id);
+    return CustomResponse.success('Product code deleted!', code, 200);
+  }
+
   async getProductPurchase(code: string, store_id: string, is_broken: any) {
     is_broken = is_broken === true || is_broken === 'true';
+    // console.log('barcode purchase', code);
     const product = (await this.productCodeRepository.findCode(code)) as any;
     if (!product) {
       return CustomResponse.error('Product not found!', 404);
     }
+    // console.log('product purchase', product);
     if (product.status !== 1) {
       return CustomResponse.error('Product is not sold yet!', 400);
     }
@@ -122,6 +141,7 @@ export class ProductService extends BaseService {
       newPrice = Number(product.fixed_price);
     }
 
+    // console.log('updated_at prodct',product.transaction_products);
     var diff = Math.abs(
       Math.floor(
         (Date.parse(product.transaction_products[0].updated_at) - Date.now()) /
