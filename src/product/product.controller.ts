@@ -88,14 +88,16 @@ export class ProductController {
   @EventPattern({ cmd: 'product_code_deleted' })
   @Exempt()
   async productCodeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.deleteProductCode(data.id),
-      'Error processing product_code_updated event',
+      {
+        queueName: 'product_code_deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_code_deleted',
+      },
     );
   }
-
-  
 
   @MessagePattern({ cmd: 'get:product-purchase/*' })
   @Describe({
