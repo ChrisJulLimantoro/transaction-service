@@ -2,57 +2,51 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { PriceService } from './price.service';
+import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
 
 @Controller('price')
 export class PriceController {
   constructor(private readonly service: PriceService) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
   @EventPattern({ cmd: 'price_created' })
   @Exempt()
   async priceCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.create(data),
-      'Error processing price_created event',
-    );
+      {
+        queueName: 'price_created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price_created',
+      },
+    )();
   }
 
   @EventPattern({ cmd: 'price_updated' })
   @Exempt()
   async priceUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.update(data.id, data),
-      'Error processing price_updated event',
-    );
+      {
+        queueName: 'price_updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price_updated',
+      },
+    )();
   }
 
   @EventPattern({ cmd: 'price_deleted' })
   @Exempt()
   async priceDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.delete(data),
-      'Error processing price_deleted event',
-    );
+      {
+        queueName: 'price_deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price_deleted',
+      },
+    )();
   }
 }
