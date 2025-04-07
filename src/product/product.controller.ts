@@ -9,91 +9,95 @@ import {
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { ProductService } from './product.service';
 import { Describe } from 'src/decorator/describe.decorator';
+import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
 
 @Controller('product')
 export class ProductController {
   constructor(private readonly service: ProductService) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
   @EventPattern({ cmd: 'product_created' })
   @Exempt()
   async productCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.create(data),
-      'Error processing product_created event',
+      {
+        queueName: 'product_created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_created',
+      },
     );
   }
 
   @EventPattern({ cmd: 'product_updated' })
   @Exempt()
   async productUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.update(data.id, data),
-      'Error processing product_updated event',
+      {
+        queueName: 'product_updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_updated',
+      },
     );
   }
 
   @EventPattern({ cmd: 'product_deleted' })
   @Exempt()
   async productDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.delete(data),
-      'Error processing product_deleted event',
+      {
+        queueName: 'product_deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_deleted',
+      },
     );
   }
 
   @EventPattern({ cmd: 'product_code_generated' })
   @Exempt()
   async productCodeGenerated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.generateProductCode(data),
-      'Error processing product_code_generated event',
+      {
+        queueName: 'product_code_generated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_code_generated',
+      },
     );
   }
 
   @EventPattern({ cmd: 'product_code_updated' })
   @Exempt()
   async productCodeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.updateProductCode(data.id, data),
-      'Error processing product_code_updated event',
+      {
+        queueName: 'product_code_updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_code_updated',
+      },
     );
   }
 
   @EventPattern({ cmd: 'product_code_deleted' })
   @Exempt()
   async productCodeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqAckHelper.handleMessageProcessing(
       context,
       () => this.service.deleteProductCode(data.id),
-      'Error processing product_code_updated event',
+      {
+        queueName: 'product_code_deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.product_code_deleted',
+      },
     );
   }
-
-  
 
   @MessagePattern({ cmd: 'get:product-purchase/*' })
   @Describe({
