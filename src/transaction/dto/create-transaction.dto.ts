@@ -11,7 +11,7 @@ export class CreateTransactionRequest {
   paid_amount: number;
   status: number;
   sub_total_price: number;
-  tax_percent: number;
+  tax_percent: number | null;
   tax_price: number;
   adjustment_price: number;
   total_price: number;
@@ -50,7 +50,7 @@ export class CreateTransactionRequest {
     this.paid_amount = parseFloat(paid_amount);
     this.status = parseInt(status);
     this.sub_total_price = parseFloat(sub_total_price);
-    this.tax_percent = parseFloat(tax_percent);
+    this.tax_percent = tax_percent !=null ? parseFloat(tax_percent) : 0;
     this.tax_price = parseFloat(tax_price);
     this.adjustment_price =
       adjustment_price != null ? parseFloat(adjustment_price) : 0;
@@ -73,7 +73,7 @@ export class CreateTransactionRequest {
       paid_amount: z.number(),
       status: z.number(),
       sub_total_price: z.number(),
-      tax_percent: z.number(),
+      tax_percent: z.number().nullable().optional(),
       adjustment_price: z.number(),
       tax_price: z.number(),
       total_price: z.number(),
