@@ -33,7 +33,15 @@ export class TransactionController {
     fe: ['transaction/sales:open'],
   })
   async getSales(@Payload() data: any) {
-    const filter = { store_id: data.body.auth.store_id, transaction_type: 1 };
+    const filter = {
+      store_id: data.body.auth.store_id,
+      transaction_type: 1,
+      date: { start: data.body.dateStart, end: data.body.dateEnd },
+      approve:
+        data.body.approve != '' && data.body.approve != undefined
+          ? Number(data.body.approve)
+          : undefined,
+    };
     const { page, limit, sort, search } = data.body;
     const response = await this.transactionService.findAll(
       filter,
@@ -51,7 +59,15 @@ export class TransactionController {
     fe: ['transaction/purchase:open'],
   })
   async getPurchase(@Payload() data: any) {
-    const filter = { store_id: data.body.auth.store_id, transaction_type: 2 };
+    const filter = {
+      store_id: data.body.auth.store_id,
+      transaction_type: 2,
+      date: { start: data.body.dateStart, end: data.body.dateEnd },
+      approve:
+        data.body.approve != '' && data.body.approve != undefined
+          ? Number(data.body.approve)
+          : undefined,
+    };
     const { page, limit, sort, search } = data.body;
     const response = await this.transactionService.findAll(
       filter,
@@ -69,7 +85,15 @@ export class TransactionController {
     fe: ['transaction/trade:open'],
   })
   async getTrade(@Payload() data: any) {
-    const filter = { store_id: data.body.auth.store_id, transaction_type: 3 };
+    const filter = {
+      store_id: data.body.auth.store_id,
+      transaction_type: 3,
+      date: { start: data.body.dateStart, end: data.body.dateEnd },
+      approve:
+        data.body.approve != '' && data.body.approve != undefined
+          ? Number(data.body.approve)
+          : undefined,
+    };
     const { page, limit, sort, search } = data.body;
     const response = await this.transactionService.findAll(
       filter,
@@ -87,9 +111,10 @@ export class TransactionController {
     fe: ['inventory/product:open', 'inventory/product:edit'],
   })
   async getPurSales(@Payload() data: any) {
-    const response = await this.transactionService.findTransProduct(data.params.id);
+    const response = await this.transactionService.findTransProduct(
+      data.params.id,
+    );
     return response;
-
   }
 
   @MessagePattern({ cmd: 'get:transproduct-notset' })
@@ -304,7 +329,10 @@ export class TransactionController {
       newstatus,
     );
     if (res.success) {
-      console.log('res di trans acpprove sales', res.data.transaction_products[0]);
+      console.log(
+        'res di trans acpprove sales',
+        res.data.transaction_products[0],
+      );
       this.financeClient.emit({ cmd: 'transaction_approved' }, res);
     }
     return res;
