@@ -541,10 +541,11 @@ export class TransactionService extends BaseService {
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
-    const pdfPath = await this.pdfService.generateSalesNota(transaction);
+    var pdfPath = await this.pdfService.generateSalesNota(transaction);
     if (!pdfPath) {
       return CustomResponse.error('Failed to generate PDF', null, 500);
     }
+    pdfPath = pdfPath.replace(/\\/g, '/');
     if (transaction.nota_link != null) {
       const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
       const deleteFile = (filePath: string) => {
