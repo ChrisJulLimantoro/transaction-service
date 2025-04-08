@@ -159,15 +159,17 @@ export class TransactionService extends BaseService {
       const product = await this.productCodeRepository.findOne(
         data.product_code_id,
       );
-      console.log(product);
       if (!product) {
         throw new Error('Product not found');
       }
-      if (product.status != 0 && transaction.transaction_type == 1) {
-        throw new Error('Product already sold');
+      if (
+        ![0, 2].includes(product.status) &&
+        transaction.transaction_type == 1
+      ) {
+        throw new Error('Product not available for sales');
       }
       if (product.status != 1 && transaction.transaction_type == 2) {
-        throw new Error('Product already not available to be bought back');
+        throw new Error('Product not available for bought back');
       }
       const transactionDetail = new CreateTransactionProductRequest(data);
       console.log('transactionDetail', transactionDetail);
@@ -576,31 +578,44 @@ export class TransactionService extends BaseService {
   }
 
   // Get Product Code not Set for generate code
-  async findProductNotSet(filters:{}) {
+  async findProductNotSet(filters: {}) {
     filters = {
       ...filters,
       transaction_type: { in: [2, 3] },
       product_code_id: null,
       transaction: {
-        approve: 1
-      }
-    }
-    const productCodes =await this.transactionProductRepository.findAll(filters)
-    console.log('filters',filters)
-    return CustomResponse.success('Successfully fetch product code not set', productCodes);
+        approve: 1,
+      },
+    };
+    const productCodes =
+      await this.transactionProductRepository.findAll(filters);
+    console.log('filters', filters);
+    return CustomResponse.success(
+      'Successfully fetch product code not set',
+      productCodes,
+    );
   }
 
   async deleteProductCode(id: string) {
     const transactionProduct = await this.transactionProductRepository.findAll({
-        product_code_id: id,
-        transaction_type: {in: [2, 3]},
-    })
+      product_code_id: id,
+      transaction_type: { in: [2, 3] },
+    });
 
     if (transactionProduct?.data?.length > 0) {
-      const updated  = await this.transactionProductRepository.update(transactionProduct.data[0].id, {product_code_id: null});
-      return CustomResponse.success('Successfully delete product code bought from customer', updated);
+      const updated = await this.transactionProductRepository.update(
+        transactionProduct.data[0].id,
+        { product_code_id: null },
+      );
+      return CustomResponse.success(
+        'Successfully delete product code bought from customer',
+        updated,
+      );
     }
-    return CustomResponse.success('Successfully delete product code', transactionProduct);
+    return CustomResponse.success(
+      'Successfully delete product code',
+      transactionProduct,
+    );
   }
 
   // Get Product Code not Set for generate code
@@ -608,27 +623,36 @@ export class TransactionService extends BaseService {
   // data -> product_code_id
   async updateProductNotSet(id: string, data: any) {
     console.log('HKSDF', id, data);
-    const transProduct =await this.transactionProductRepository.findOne(id) // transref_id
+    const transProduct = await this.transactionProductRepository.findOne(id); // transref_id
     if (!transProduct) {
       return CustomResponse.error('Product Code not found', null, 404);
     }
-    const productCode = await this.productCodeRepository.findOne(data.product_code_id);
+    const productCode = await this.productCodeRepository.findOne(
+      data.product_code_id,
+    );
     if (!productCode) {
       return CustomResponse.error('Product Code not found', null, 404);
     }
-    console.log('ini productcode asdf',data.product_code_id);
+    console.log('ini productcode asdf', data.product_code_id);
     const updatedData = await this.transactionProductRepository.update(id, {
       product_code_id: data.product_code_id,
     });
-    return CustomResponse.success('Successfully fetch product code not set', transProduct);
+    return CustomResponse.success(
+      'Successfully fetch product code not set',
+      transProduct,
+    );
   }
 
   async findTransProduct(id) {
-    const transactionProduct = await this.transactionProductRepository.findOne(id);
+    const transactionProduct =
+      await this.transactionProductRepository.findOne(id);
     if (!transactionProduct) {
       return CustomResponse.error('Transaction Product not found', null, 404);
     }
-    return CustomResponse.success('Successfully fetch transaction product', transactionProduct);
+    return CustomResponse.success(
+      'Successfully fetch transaction product',
+      transactionProduct,
+    );
   }
 
   // MarketPlace Transaction
