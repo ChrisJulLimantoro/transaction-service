@@ -36,7 +36,10 @@ export class BaseRepository<T> {
   }> {
     const prismaClient = tx ?? this.prisma;
     const fields = (await this.getModelFields()).filter(
-      (field) => !field.name.includes('id'),
+      (field) =>
+        !field.name.includes('id') &&
+        !field.name.includes('_by') &&
+        !field.name.includes('_link'),
     );
     const stringFields = fields.filter(
       (field) => field.type.toLowerCase() === 'string',
@@ -205,7 +208,7 @@ export class BaseRepository<T> {
 
     return model.fields.map((field) => ({
       name: field.name,
-      type: field.type,
+      type: field.isList ? `${field.type}[]` : field.type,
     }));
   }
 }

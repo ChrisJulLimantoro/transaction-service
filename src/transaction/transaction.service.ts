@@ -73,7 +73,7 @@ export class TransactionService extends BaseService {
       where: { id: data.store_id },
     });
 
-    const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth()}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
+    const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
     data.code = code;
     data.paid_amount = data.total_price; // for now assume always fully paid
 
