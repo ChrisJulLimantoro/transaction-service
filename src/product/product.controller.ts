@@ -26,7 +26,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_created',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'product_updated' })
@@ -40,7 +40,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_updated',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'product_deleted' })
@@ -54,7 +54,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_deleted',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'product_code_generated' })
@@ -68,7 +68,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_code_generated',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'product_code_updated' })
@@ -82,7 +82,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_code_updated',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'product_code_deleted' })
@@ -96,7 +96,7 @@ export class ProductController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.product_code_deleted',
       },
-    );
+    )();
   }
 
   @MessagePattern({ cmd: 'get:product-purchase/*' })

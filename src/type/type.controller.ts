@@ -19,7 +19,7 @@ export class TypeController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.type_created',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'type_updated' })
@@ -33,7 +33,7 @@ export class TypeController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.type_updated',
       },
-    );
+    )();
   }
 
   @EventPattern({ cmd: 'type_deleted' })
@@ -47,6 +47,6 @@ export class TypeController {
         useDLQ: true,
         dlqRoutingKey: 'dlq.type_deleted',
       },
-    );
+    )();
   }
 }
