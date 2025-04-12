@@ -64,25 +64,38 @@ export class TransactionService extends BaseService {
     }
 
     // Generate Code
-    const date = new Date(data.date);
-    const count = await this.repository.count({
-      transaction_type: data.transaction_type,
-      date: date,
-    });
-    const store = await this.prisma.store.findUnique({
-      where: { id: data.store_id },
-    });
+    var transaction = null;
+    await this.prisma.$transaction(async (tx) => {
+      const date = new Date(data.date);
+      const count = await this.repository.count(
+        {
+          transaction_type: data.transaction_type,
+          date: {
+            gte: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+            lt: new Date(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate() + 1,
+            ),
+          },
+        },
+        tx,
+      );
+      const store = await this.prisma.store.findUnique({
+        where: { id: data.store_id },
+      });
 
-    const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
-    data.code = code;
-    data.paid_amount = data.total_price; // for now assume always fully paid
+      const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
+      data.code = code;
+      data.paid_amount = data.total_price; // for now assume always fully paid
 
-    const transData = new CreateTransactionRequest(data);
-    const validatedData = this.validation.validate(
-      transData,
-      this.createSchema,
-    );
-    const transaction = await this.repository.create(validatedData);
+      const transData = new CreateTransactionRequest(data);
+      const validatedData = this.validation.validate(
+        transData,
+        this.createSchema,
+      );
+      transaction = await this.repository.create(validatedData, tx);
+    });
 
     if (!transaction) {
       return CustomResponse.error('Failed to create transaction', null, 500);

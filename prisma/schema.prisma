@@ -334,7 +334,7 @@ model VoucherOwned {
 model Transaction {
   id               String    @id @default(uuid()) @db.Uuid
   date             DateTime  @default(now())
-  code             String
+  code             String    @unique
   transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
   payment_method   Int // 1: Cash, 2: Bank Transfer, 3: Credit Card, 4: Debit Card
   paid_amount      Decimal   @default(0) @db.Decimal // Current Paid Ammount
