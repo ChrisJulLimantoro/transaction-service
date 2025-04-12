@@ -445,6 +445,18 @@ export class TransactionService extends BaseService {
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
+    if (
+      transaction.payment_link != null &&
+      transaction.status != 0 &&
+      transaction.status != 1 &&
+      transaction.status != -1
+    ) {
+      return CustomResponse.error(
+        'Marketplace transactions cannot be deleted in settlement status',
+        null,
+        404,
+      );
+    }
 
     const transactionProduct = await this.prisma.transactionProduct.findMany({
       where: { transaction_id: id },
