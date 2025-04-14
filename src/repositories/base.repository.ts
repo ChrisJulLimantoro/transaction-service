@@ -12,12 +12,25 @@ export class BaseRepository<T> {
   ) {}
 
   // Create a new record with possible relations
-  async create(data: any, tx?: Prisma.TransactionClient): Promise<T> {
+  async create(
+    data: any,
+    tx?: Prisma.TransactionClient,
+    user_id?: string,
+  ): Promise<T> {
     const prismaClient = tx ?? this.prisma;
-    return prismaClient[this.modelName].create({
+    const created = await prismaClient[this.modelName].create({
       data,
       include: this.relations,
     });
+    await this.actionLog(
+      this.modelName,
+      created.id,
+      'CREATE',
+      null,
+      user_id,
+      tx,
+    );
+    return created;
   }
 
   // Get all records with possible relations and filter criteria
@@ -143,19 +156,30 @@ export class BaseRepository<T> {
     id: string,
     data: any,
     tx?: Prisma.TransactionClient,
+    user_id?: string,
   ): Promise<T> {
     const prismaClient = tx ?? this.prisma;
+    const before = await prismaClient[this.modelName].findFirst({
+      where: this.isSoftDelete ? { id, deleted_at: null } : { id },
+    });
     data.updated_at = new Date();
-    return prismaClient[this.modelName].update({
+    const updated = await prismaClient[this.modelName].update({
       where: this.isSoftDelete ? { id, deleted_at: null } : { id },
       data,
-      include: this.relations,
     });
+    const diff = this.getDiff(before, updated);
+    await this.actionLog(this.modelName, id, 'UPDATE', diff, user_id, tx);
+    return updated;
   }
 
   // Delete a record by ID
-  async delete(id: string, tx?: Prisma.TransactionClient): Promise<T> {
+  async delete(
+    id: string,
+    tx?: Prisma.TransactionClient,
+    user_id?: string,
+  ): Promise<T> {
     const prismaClient = tx ?? this.prisma;
+    await this.actionLog(this.modelName, id, 'DELETE', null, user_id, tx);
     if (this.isSoftDelete) {
       return prismaClient[this.modelName].update({
         where: { id },
@@ -168,8 +192,13 @@ export class BaseRepository<T> {
   }
 
   // Restore a soft deleted record
-  async restore(id: string, tx?: Prisma.TransactionClient): Promise<T> {
+  async restore(
+    id: string,
+    tx?: Prisma.TransactionClient,
+    user_id?: string,
+  ): Promise<T> {
     const prismaClient = tx ?? this.prisma;
+    await this.actionLog(this.modelName, id, 'RESTORE', null, user_id, tx);
     return prismaClient[this.modelName].update({
       where: { id },
       data: { deleted_at: null, updated_at: new Date() },
@@ -210,5 +239,53 @@ export class BaseRepository<T> {
       name: field.name,
       type: field.isList ? `${field.type}[]` : field.type,
     }));
+  }
+
+  normalize(val: any): any {
+    if (typeof val === 'string' && !isNaN(val as any)) {
+      return Number(val);
+    }
+    return val;
+  }
+
+  // Add logging
+  getDiff(
+    before: Record<string, any>,
+    after: Record<string, any>,
+    excludeKeys: string[] = ['id', 'updated_at', 'created_at'],
+  ) {
+    const diff: Record<string, { from: any; to: any }> = {};
+    for (const key in after) {
+      if (excludeKeys.includes(key)) continue;
+
+      const beforeValue = this.normalize(before[key]);
+      const afterValue = this.normalize(after[key]);
+
+      if (beforeValue != afterValue) {
+        diff[key] = { from: beforeValue, to: afterValue };
+      }
+    }
+    return diff;
+  }
+
+  async actionLog(
+    resource: string,
+    resource_id: string,
+    event: string,
+    diff: any,
+    user_id: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const log = {
+      resource,
+      resource_id,
+      event,
+      diff: diff,
+      user_id,
+    };
+    const prismaClient = tx ?? this.prisma;
+    return prismaClient.actionLog.create({
+      data: log,
+    });
   }
 }

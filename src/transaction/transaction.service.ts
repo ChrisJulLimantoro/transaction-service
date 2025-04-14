@@ -54,7 +54,7 @@ export class TransactionService extends BaseService {
     3: { name: 'Trade', label: 'TRA' },
   };
 
-  async create(data: any): Promise<CustomResponse> {
+  async create(data: any, user_id?: string): Promise<CustomResponse> {
     if (data.transaction_details.length === 0) {
       return CustomResponse.error(
         'Transaction Details must not be empty',
@@ -94,7 +94,7 @@ export class TransactionService extends BaseService {
         transData,
         this.createSchema,
       );
-      transaction = await this.repository.create(validatedData, tx);
+      transaction = await this.repository.create(validatedData, tx, user_id);
     });
 
     if (!transaction) {
@@ -117,7 +117,7 @@ export class TransactionService extends BaseService {
     console.log('transactionDetails', transactionDetails);
     for (const detail of transactionDetails) {
       try {
-        var newdetail = await this.createDetail(detail);
+        var newdetail = await this.createDetail(detail, user_id);
       } catch (error) {
         // delete transaction if failed to create detail
         console.error('Failed to create transaction detail', error);
@@ -133,11 +133,15 @@ export class TransactionService extends BaseService {
 
     data = transaction;
     data.transaction_details = transDetails;
-    this.generatePdf(transaction.id);
+    this.generatePdf(transaction.id, user_id);
     return CustomResponse.success('Transaction created successfully', data);
   }
 
-  async update(id: string, data: any): Promise<CustomResponse> {
+  async update(
+    id: string,
+    data: any,
+    user_id?: string,
+  ): Promise<CustomResponse> {
     if (data.status) {
       // update status of the detail too
       const transaction = await this.repository.findOne(id);
@@ -146,16 +150,22 @@ export class TransactionService extends BaseService {
       }
       const products = transaction.transaction_products;
       for (const product of products) {
-        await this.transactionProductRepository.update(product.id, {
-          status: data.status,
-        });
+        await this.transactionProductRepository.update(
+          product.id,
+          {
+            status: data.status,
+          },
+          null,
+          user_id,
+        );
       }
     }
-    this.generatePdf(id);
-    return super.update(id, data);
+    // Generate PDF
+    this.generatePdf(id, user_id);
+    return super.update(id, data, user_id);
   }
 
-  async createDetail(data: any): Promise<CustomResponse> {
+  async createDetail(data: any, user_id?: string): Promise<CustomResponse> {
     const transaction = await this.repository.findOne(data.transaction_id);
     if (!transaction) {
       return CustomResponse.error(
@@ -190,7 +200,11 @@ export class TransactionService extends BaseService {
         transactionDetail,
         CreateTransactionProductRequest.schema(),
       );
-      result = await this.transactionProductRepository.create(validatedData);
+      result = await this.transactionProductRepository.create(
+        validatedData,
+        null,
+        user_id,
+      );
       // Update product status Locally
       const code = await this.productCodeRepository.update(
         data.product_code_id,
@@ -198,6 +212,8 @@ export class TransactionService extends BaseService {
           status:
             data.transaction_type == 1 ? 1 : data.transaction_type == 2 ? 2 : 0,
         },
+        null,
+        user_id,
       );
       console.log('code', code);
       // Broadcast the update to other services
@@ -215,7 +231,11 @@ export class TransactionService extends BaseService {
         transactionDetail,
         CreateTransactionOperationRequest.schema(),
       );
-      result = await this.transactionOperationRepository.create(validatedData);
+      result = await this.transactionOperationRepository.create(
+        validatedData,
+        null,
+        user_id,
+      );
     } else {
       const transactionDetail = new CreateTransactionProductRequest(data);
       console.log('transactionDetail', transactionDetail);
@@ -224,7 +244,11 @@ export class TransactionService extends BaseService {
         transactionDetail,
         CreateTransactionProductRequest.schema(),
       );
-      result = await this.transactionProductRepository.create(validatedData);
+      result = await this.transactionProductRepository.create(
+        validatedData,
+        null,
+        user_id,
+      );
     }
 
     if (!result) {
@@ -240,7 +264,11 @@ export class TransactionService extends BaseService {
     );
   }
 
-  async updateDetail(id: string, data: any): Promise<CustomResponse> {
+  async updateDetail(
+    id: string,
+    data: any,
+    user_id?: string,
+  ): Promise<CustomResponse> {
     data.unit = data.quantity; // for now assume unit is same as quantity [for Operation]
     data.weight = data.quantity; // for now assume weight is same as quantity [for product]
 
@@ -258,7 +286,12 @@ export class TransactionService extends BaseService {
         transactionDetailData,
         CreateTransactionOperationRequest.schema(),
       );
-      await this.transactionOperationRepository.update(id, validatedData);
+      await this.transactionOperationRepository.update(
+        id,
+        validatedData,
+        null,
+        user_id,
+      );
       updatedDetail = await this.transactionOperationRepository.findOne(id); // Fetch updated data
     } else {
       const transactionDetail =
@@ -283,11 +316,16 @@ export class TransactionService extends BaseService {
         transactionDetailData,
         CreateTransactionProductRequest.schema(),
       );
-      await this.transactionProductRepository.update(id, validatedData);
+      await this.transactionProductRepository.update(
+        id,
+        validatedData,
+        null,
+        user_id,
+      );
       updatedDetail = await this.transactionProductRepository.findOne(id); // Fetch updated data
     }
 
-    const syncResult = await this.syncDetail(data.transaction_id); // Get sync detail result
+    const syncResult = await this.syncDetail(data.transaction_id, user_id); // Get sync detail result
 
     return CustomResponse.success('Transaction Detail updated successfully', {
       updatedDetail,
@@ -347,7 +385,7 @@ export class TransactionService extends BaseService {
     return adjust;
   }
 
-  async deleteDetail(id: string): Promise<CustomResponse> {
+  async deleteDetail(id: string, user_id?: string): Promise<CustomResponse> {
     const product = await this.transactionProductRepository.findOne(id);
     const operation = await this.transactionOperationRepository.findOne(id);
 
@@ -359,7 +397,7 @@ export class TransactionService extends BaseService {
       if (product.product_code.status == 2 && product.transaction_type == 1) {
         return CustomResponse.error('Product Already bought back', null, 400);
       }
-      await this.transactionProductRepository.delete(id);
+      await this.transactionProductRepository.delete(id, null, user_id);
       if (product.product_code_id != null) {
         // Update product status Locally
         const code = await this.productCodeRepository.update(
@@ -383,11 +421,12 @@ export class TransactionService extends BaseService {
         );
       }
     } else {
-      await this.transactionOperationRepository.delete(id);
+      await this.transactionOperationRepository.delete(id, null, user_id);
     }
 
     const updated = await this.syncDetail(
       product ? product.transaction_id : operation.transaction_id,
+      user_id,
     );
 
     return CustomResponse.success(
@@ -396,7 +435,7 @@ export class TransactionService extends BaseService {
     );
   }
 
-  async syncDetail(transaction_id: string) {
+  async syncDetail(transaction_id: string, user_id?: string) {
     // Get Transaction
     const transaction = await this.repository.findOne(transaction_id);
     if (!transaction) {
@@ -449,11 +488,13 @@ export class TransactionService extends BaseService {
     const res = await this.transactionRepository.update(
       transaction_id,
       updateData,
+      null,
+      user_id,
     );
     return res;
   }
 
-  async delete(id: string): Promise<CustomResponse> {
+  async delete(id: string, user_id?: string): Promise<CustomResponse> {
     const transaction = await this.repository.findOne(id);
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
@@ -494,7 +535,11 @@ export class TransactionService extends BaseService {
             );
           }
 
-          await this.transactionProductRepository.delete(detail.id, tx);
+          await this.transactionProductRepository.delete(
+            detail.id,
+            tx,
+            user_id,
+          );
 
           if (detail.product_code_id != null) {
             const code = await this.productCodeRepository.update(
@@ -503,6 +548,7 @@ export class TransactionService extends BaseService {
                 status: detail.transaction_type == 1 ? 0 : 1,
               },
               tx,
+              user_id,
             );
             console.log('code deleted', code);
 
@@ -518,10 +564,14 @@ export class TransactionService extends BaseService {
         }
 
         for (const detail of transactionOperation) {
-          await this.transactionOperationRepository.delete(detail.id, tx);
+          await this.transactionOperationRepository.delete(
+            detail.id,
+            tx,
+            user_id,
+          );
         }
 
-        return await this.repository.delete(id, tx);
+        return await this.repository.delete(id, tx, user_id);
       });
 
       // PUT it Outside of transaction
@@ -549,19 +599,28 @@ export class TransactionService extends BaseService {
     }
   }
 
-  async updateStatus(id: string, status: number): Promise<CustomResponse> {
+  async updateStatus(
+    id: string,
+    status: number,
+    user_id?: string,
+  ): Promise<CustomResponse> {
     const transaction = await this.repository.findOne(id);
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
-    const res = await this.repository.update(id, { approve: status });
+    const res = await this.repository.update(
+      id,
+      { approve: status },
+      null,
+      user_id,
+    );
     return CustomResponse.success(
       'Transaction status updated successfully',
       res,
     );
   }
 
-  async generatePdf(id: string) {
+  async generatePdf(id: string, user_id?: string) {
     const transaction = await this.repository.findOne(id);
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
@@ -584,9 +643,14 @@ export class TransactionService extends BaseService {
       };
       deleteFile(filePath);
     }
-    const updatedTransaction = await this.repository.update(id, {
-      nota_link: pdfPath.split('/storage/notas/')[1],
-    });
+    const updatedTransaction = await this.repository.update(
+      id,
+      {
+        nota_link: pdfPath.split('/storage/notas/')[1],
+      },
+      null,
+      user_id,
+    );
 
     return CustomResponse.success(
       'PDF generated successfully',
@@ -622,7 +686,7 @@ export class TransactionService extends BaseService {
     );
   }
 
-  async deleteProductCode(id: string) {
+  async deleteProductCode(id: string, user_id?: string) {
     const transactionProduct = await this.transactionProductRepository.findAll({
       product_code_id: id,
       transaction_type: { in: [2, 3] },
@@ -632,6 +696,8 @@ export class TransactionService extends BaseService {
       const updated = await this.transactionProductRepository.update(
         transactionProduct.data[0].id,
         { product_code_id: null },
+        null,
+        user_id,
       );
       return CustomResponse.success(
         'Successfully delete product code bought from customer',
@@ -647,7 +713,7 @@ export class TransactionService extends BaseService {
   // Get Product Code not Set for generate code
   // id -> transref_id (transProd.id)
   // data -> product_code_id
-  async updateProductNotSet(id: string, data: any) {
+  async updateProductNotSet(id: string, data: any, user_id?: string) {
     console.log('HKSDF', id, data);
     const transProduct = await this.transactionProductRepository.findOne(id); // transref_id
     if (!transProduct) {
@@ -660,9 +726,14 @@ export class TransactionService extends BaseService {
       return CustomResponse.error('Product Code not found', null, 404);
     }
     console.log('ini productcode asdf', data.product_code_id);
-    const updatedData = await this.transactionProductRepository.update(id, {
-      product_code_id: data.product_code_id,
-    });
+    const updatedData = await this.transactionProductRepository.update(
+      id,
+      {
+        product_code_id: data.product_code_id,
+      },
+      null,
+      user_id,
+    );
     return CustomResponse.success(
       'Successfully fetch product code not set',
       transProduct,

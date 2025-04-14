@@ -18,10 +18,10 @@ export abstract class BaseService {
   }
 
   // Create
-  async create(data: any): Promise<CustomResponse> {
+  async create(data: any, user_id?: string): Promise<CustomResponse> {
     data = this.transformCreateData(data);
     const validatedData = this.validation.validate(data, this.createSchema);
-    const newData = await this.repository.create(validatedData);
+    const newData = await this.repository.create(validatedData, user_id);
     if (!newData) {
       return CustomResponse.error('Failed to create new data', null, 500);
     }
@@ -65,36 +65,45 @@ export abstract class BaseService {
   }
 
   // Update
-  async update(id: string, data: any): Promise<CustomResponse> {
+  async update(
+    id: string,
+    data: any,
+    user_id?: string,
+  ): Promise<CustomResponse> {
     data = this.transformUpdateData(data);
     const oldData = await this.repository.findOne(id);
     if (!oldData) {
       return CustomResponse.error('Data not found', null, 404);
     }
     const validatedData = this.validation.validate(data, this.updateSchema);
-    const newData = await this.repository.update(id, validatedData);
+    const newData = await this.repository.update(
+      id,
+      validatedData,
+      null,
+      user_id,
+    );
     return CustomResponse.success('Data Updated!', newData, 200);
   }
 
   // Delete
-  async delete(id: string): Promise<CustomResponse> {
+  async delete(id: string, user_id?: string): Promise<CustomResponse> {
     const data = await this.repository.findOne(id);
     if (!data) {
       return CustomResponse.error('Data not found', null, 404);
     }
-    await this.repository.delete(id);
+    await this.repository.delete(id, user_id);
     return CustomResponse.success('Data deleted!', data, 200);
   }
 
   async sync(data: any[]) {
     const transformedData = data.map((d) => this.transformCreateData(d));
-  
+
     const d = await this.repository.sync(transformedData); // Pass all transformed data at once
-  
+
     if (!d) {
       return CustomResponse.error('Failed to sync Data', null, 500);
     }
-  
+
     return CustomResponse.success('Data Synced!', d, 200);
   }
 }

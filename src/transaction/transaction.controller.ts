@@ -134,18 +134,6 @@ export class TransactionController {
     return response;
   }
 
-  // @EventPattern({ cmd: 'transproduct_notset' })
-  // @Exempt()
-  // async updatePurSalesNotSet(@Payload() data: any) {
-  //   console.log('data transproduct not set', data);
-  //   const id = data.transref_id;
-  //   const body = {
-  //     product_code_id: data.product_code_id,
-  //   };
-  //   const response = await this.transactionService.updateProductNotSet(id, body);
-  //   return response;
-  // }
-
   @MessagePattern({ cmd: 'get:transaction/*' })
   @Describe({
     description: 'Get Transaction By ID',
@@ -190,8 +178,10 @@ export class TransactionController {
     ],
   })
   async createTransaction(@Payload() data: any) {
-    console.log('data body transaction purchase', data.body);
-    const response = await this.transactionService.create(data.body);
+    const response = await this.transactionService.create(
+      data.body,
+      data.params.user.id,
+    );
     if (response.success) {
       this.marketplaceClient.emit('transaction_operational_created', response);
     }
@@ -209,7 +199,10 @@ export class TransactionController {
   })
   async createTransactionDetail(@Payload() data: any) {
     console.log('data body transaction detail', data.body);
-    const response = await this.transactionService.createDetail(data.body);
+    const response = await this.transactionService.createDetail(
+      data.body,
+      data.params.user.id,
+    );
     if (response) {
       this.marketplaceClient.emit('transaction_product_created', response.data);
     }
@@ -228,14 +221,18 @@ export class TransactionController {
   async updateTransaction(@Payload() data: any) {
     const id = data.params.id;
     const body = data.body;
-    const response = await this.transactionService.update(id, body);
+    const response = await this.transactionService.update(
+      id,
+      body,
+      data.params.user.id,
+    );
     if (response) {
       this.marketplaceClient.emit(
         'transaction_operational_updated',
         response.data,
       );
     }
-    return await this.transactionService.update(id, body);
+    return response;
   }
 
   @MessagePattern({ cmd: 'put:transaction-detail/*' })
@@ -250,7 +247,11 @@ export class TransactionController {
   async updateTransactionDetail(@Payload() data: any) {
     const id = data.params.id;
     const body = data.body;
-    const response = await this.transactionService.updateDetail(id, body);
+    const response = await this.transactionService.updateDetail(
+      id,
+      body,
+      data.params.user.id,
+    );
     if (response) {
       this.marketplaceClient.emit('transaction_detail_updated', response.data);
     }
@@ -268,7 +269,10 @@ export class TransactionController {
   })
   async deleteTransaction(@Payload() data: any) {
     const id = data.params.id;
-    const response = await this.transactionService.delete(id);
+    const response = await this.transactionService.delete(
+      id,
+      data.params.user.id,
+    );
     if (response) {
       this.marketplaceClient.emit('transaction_deleted', { id: id });
     }
@@ -286,7 +290,10 @@ export class TransactionController {
   })
   async deleteTransactionDetail(@Payload() data: any) {
     const id = data.params.id;
-    const response = await this.transactionService.deleteDetail(id);
+    const response = await this.transactionService.deleteDetail(
+      id,
+      data.params.user.id,
+    );
     if (response) {
       this.marketplaceClient.emit('transaction_detail_deleted', {
         id: id,
@@ -327,6 +334,7 @@ export class TransactionController {
     const res = await this.transactionService.updateStatus(
       params.id,
       newstatus,
+      data.params.user.id,
     );
     if (res.success) {
       console.log(
@@ -370,6 +378,7 @@ export class TransactionController {
     const res = await this.transactionService.updateStatus(
       params.id,
       newstatus,
+      data.params.user.id,
     );
     if (res.success) {
       this.financeClient.emit({ cmd: 'transaction_disapproved' }, res);

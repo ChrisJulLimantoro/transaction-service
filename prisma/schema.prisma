@@ -471,3 +471,17 @@ model FailedMessage {
 
   @@map("failed_messages")
 }
+
+model ActionLog {
+  id          BigInt  @id @default(autoincrement())
+  user_id     String?  @db.Uuid
+  event       String
+  resource    String
+  resource_id String
+  diff        Json?
+  timestamp   DateTime @default(now())
+
+  @@map("action_logs")
+  @@index([user_id])
+  @@index([resource, resource_id])
+}
