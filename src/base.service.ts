@@ -95,8 +95,8 @@ export abstract class BaseService {
     return CustomResponse.success('Data deleted!', data, 200);
   }
 
-  async sync(data: any[]) {
-    const transformedData = data.map((d) => this.transformCreateData(d));
+  async sync(data: any) {
+    const transformedData = data.data.map((d) => this.transformCreateData(d));
 
     const d = await this.repository.sync(transformedData); // Pass all transformed data at once
 
