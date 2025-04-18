@@ -55,11 +55,12 @@ export class TransactionService extends BaseService {
     3: { name: 'Trade', label: 'TRA' },
   };
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async autoExpireUnpaidTransactions() {
     console.log('🔁 Running auto-expire check for unpaid transactions');
 
     const now = new Date();
+    now.setHours(now.getHours() + 7); // WIB offset
 
     const expiredTransactions = await this.prisma.transaction.findMany({
       where: {
@@ -1139,8 +1140,6 @@ export class TransactionService extends BaseService {
         },
       );
 
-      context.getChannelRef().ack(context.getMessage());
-
       return {
         success: true,
         message: 'Transaction processed successfully',
@@ -1152,7 +1151,6 @@ export class TransactionService extends BaseService {
         },
       };
     } catch (error) {
-      context.getChannelRef().nack(context.getMessage());
       console.error('❌ Error processing transaction:', error.message);
       return {
         success: false,
