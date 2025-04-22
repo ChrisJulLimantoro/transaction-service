@@ -17,6 +17,7 @@ import { ClientProxy, RmqContext } from '@nestjs/microservices';
 import { PdfService } from './pdf.service';
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -53,6 +54,47 @@ export class TransactionService extends BaseService {
     2: { name: 'Purchase', label: 'PUR' },
     3: { name: 'Trade', label: 'TRA' },
   };
+
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async autoExpireUnpaidTransactions() {
+    console.log('🔁 Running auto-expire check for unpaid transactions');
+
+    const now = new Date();
+    now.setHours(now.getHours() + 7);
+
+    const expiredTransactions = await this.prisma.transaction.findMany({
+      where: {
+        deleted_at: null,
+        expired_at: {
+          not: null,
+          lt: now,
+        },
+        status: {
+          notIn: [1, 2, -1],
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    console.log(`🕒 Found ${expiredTransactions.length} expired transactions`);
+
+    for (const trx of expiredTransactions) {
+      console.warn(`⛔ Expiring transaction ${trx.id}`);
+
+      try {
+        await this.processMidtransNotification({
+          transaction_status: 'expire',
+          order_id: trx.id,
+        });
+      } catch (error) {
+        console.error(
+          `❌ Failed to expire transaction ${trx.id}: ${error.message}`,
+        );
+      }
+    }
+  }
 
   async create(data: any, user_id?: string): Promise<CustomResponse> {
     if (data.transaction_details.length === 0) {
@@ -816,7 +858,8 @@ export class TransactionService extends BaseService {
         transaction_status === 'deny' ||
         transaction_status === 'expire' ||
         transaction_status === 'cancel' ||
-        transaction_status === 'failure'
+        transaction_status === 'failure' ||
+        transaction_status === null
       ) {
         console.log(
           `Soft deleting transaction ${order_id} due to status: ${transaction_status}`,
@@ -949,10 +992,7 @@ export class TransactionService extends BaseService {
           '0',
         )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      const paymentLink = await this.requestPaymentLink(
-        data,
-        formattedStartTime,
-      );
+      const paymentLink = await this.requestPaymentLink(data);
 
       const filteredItems = data.items.filter(
         (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
@@ -964,7 +1004,7 @@ export class TransactionService extends BaseService {
 
       const store = await this.prisma.store.findUnique({
         where: { id: String(data.storeId) },
-        select: { code: true },
+        select: { code: true, tax_percentage: true },
       });
       const count = await this.prisma.transaction.count({
         where: { store_id: String(data.storeId) },
@@ -990,6 +1030,7 @@ export class TransactionService extends BaseService {
             sub_total_price: subTotalPrice,
             total_price: data.grossAmount,
             tax_price: data.taxAmount,
+            tax_percent: store.tax_percentage,
             payment_link: paymentLink,
             poin_earned: data.poin_earned,
             expired_at: expiredAt,
@@ -1100,8 +1141,6 @@ export class TransactionService extends BaseService {
         },
       );
 
-      context.getChannelRef().ack(context.getMessage());
-
       return {
         success: true,
         message: 'Transaction processed successfully',
@@ -1113,7 +1152,6 @@ export class TransactionService extends BaseService {
         },
       };
     } catch (error) {
-      context.getChannelRef().nack(context.getMessage());
       console.error('❌ Error processing transaction:', error.message);
       return {
         success: false,
@@ -1122,10 +1160,7 @@ export class TransactionService extends BaseService {
     }
   }
 
-  private async requestPaymentLink(
-    data: any,
-    formattedStartTime: string,
-  ): Promise<string> {
+  private async requestPaymentLink(data: any): Promise<string> {
     try {
       const response = await axios.post(
         'https://app.sandbox.midtrans.com/snap/v1/transactions',
@@ -1162,7 +1197,6 @@ export class TransactionService extends BaseService {
             secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
           },
           expiry: {
-            start_time: formattedStartTime,
             unit: 'minute',
             duration: 60,
           },

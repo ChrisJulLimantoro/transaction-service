@@ -21,6 +21,7 @@ import { AccountModule } from './account/account.module';
 import { PayoutController } from './payout/payout.controller';
 import { PayoutService } from './payout/payout.service';
 import { PayoutModule } from './payout/payout.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PayoutModule } from './payout/payout.module';
     ValidationModule.forRoot(),
     PrismaModule,
     CategoryModule,
+    ScheduleModule.forRoot(),
     TypeModule,
     ProductModule,
     PriceModule,
