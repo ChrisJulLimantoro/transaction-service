@@ -2,69 +2,57 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { CategoryService } from './category.service';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('category')
 export class CategoryController {
-  constructor(private readonly service: CategoryService) {}
+  constructor(
+    private readonly service: CategoryService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
-  @EventPattern({ cmd: 'category_created' })
+  @EventPattern('category.created')
   @Exempt()
   async categoryCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
+      () => this.service.create(data.data, data.user),
       {
-        queueName: 'category_created',
+        queueName: 'category.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.category_created',
+        dlqRoutingKey: 'dlq.category.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'category_updated' })
+  @EventPattern('category.updated')
   @Exempt()
   async categoryUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
+      () => this.service.update(data.data.id, data.data, data.user),
       {
-        queueName: 'category_updated',
+        queueName: 'category.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.category_updated',
+        dlqRoutingKey: 'dlq.category.updated',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'category_deleted' })
+  @EventPattern('category.deleted')
   @Exempt()
   async categoryDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
+      () => this.service.delete(data.data, data.user),
       {
-        queueName: 'category_deleted',
+        queueName: 'category.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.category_deleted',
+        dlqRoutingKey: 'dlq.category.deleted',
+        prisma: this.prisma,
       },
     )();
   }

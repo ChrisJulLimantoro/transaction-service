@@ -9,11 +9,15 @@ import {
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { StoreService } from './store.service';
 import { Describe } from 'src/decorator/describe.decorator';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('store')
 export class StoreController {
-  constructor(private readonly service: StoreService) {}
+  constructor(
+    private readonly service: StoreService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @MessagePattern({ cmd: 'get:store/*' })
   @Describe({
@@ -25,71 +29,75 @@ export class StoreController {
     return await this.service.findOne(id);
   }
 
-  @EventPattern({ cmd: 'store_created' })
+  @EventPattern('store.created')
   @Exempt()
   async storeCreated(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Store created emit received', data);
 
     const sanitizedData = {
-      ...data,
-      created_at: new Date(data.created_at),
-      updated_at: new Date(data.updated_at),
-      deleted_at: data.deleted_at ? new Date(data.deleted_at) : null,
+      ...data.data,
+      created_at: new Date(data.data.created_at),
+      updated_at: new Date(data.data.updated_at),
+      deleted_at: data.data.deleted_at ? new Date(data.data.deleted_at) : null,
     };
 
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(sanitizedData),
+      () => this.service.create(sanitizedData, data.user),
       {
-        queueName: 'store_created',
+        queueName: 'store.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.store_created',
+        dlqRoutingKey: 'dlq.store.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'store_updated' })
+  @EventPattern('store.updated')
   @Exempt()
   async storeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Store updated emit received', data);
 
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
+      () => this.service.update(data.data.id, data.data, data.user),
       {
-        queueName: 'store_updated',
+        queueName: 'store.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.store_updated',
+        dlqRoutingKey: 'dlq.store.updated',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'store_deleted' })
+  @EventPattern('store.deleted')
   @Exempt()
   async storeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Store deleted emit received', data);
 
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
+      () => this.service.delete(data.data, data.user),
       {
-        queueName: 'store_deleted',
+        queueName: 'store.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.store_deleted',
+        dlqRoutingKey: 'dlq.store.deleted',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'store_sync' })
+  @EventPattern('store.sync')
   @Exempt()
   async storeSync(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.sync(data),
+      () => this.service.sync(data.data),
       {
-        queueName: 'store_sync',
+        queueName: 'store.sync',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.store_sync',
+        dlqRoutingKey: 'dlq.store.sync',
+        prisma: this.prisma,
       },
     )();
   }

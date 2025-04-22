@@ -2,50 +2,55 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { TypeService } from './type.service';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('type')
 export class TypeController {
-  constructor(private readonly service: TypeService) {}
+  constructor(
+    private readonly service: TypeService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  @EventPattern({ cmd: 'type_created' })
+  @EventPattern('type.created')
   @Exempt()
   async typeCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
+      () => this.service.create(data.data, data.user),
       {
-        queueName: 'type_created',
+        queueName: 'type.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.type_created',
+        dlqRoutingKey: 'dlq.type.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'type_updated' })
+  @EventPattern('type.updated')
   @Exempt()
   async typeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
+      () => this.service.update(data.data.id, data.data, data.user),
       {
-        queueName: 'type_updated',
+        queueName: 'type.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.type_updated',
+        dlqRoutingKey: 'dlq.type.updated',
       },
     )();
   }
 
-  @EventPattern({ cmd: 'type_deleted' })
+  @EventPattern('type.deleted')
   @Exempt()
   async typeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
+      () => this.service.delete(data.data, data.user),
       {
-        queueName: 'type_deleted',
+        queueName: 'type.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.type_deleted',
+        dlqRoutingKey: 'dlq.type.deleted',
       },
     )();
   }

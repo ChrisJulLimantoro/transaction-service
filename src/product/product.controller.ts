@@ -9,92 +9,102 @@ import {
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { ProductService } from './product.service';
 import { Describe } from 'src/decorator/describe.decorator';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('product')
 export class ProductController {
-  constructor(private readonly service: ProductService) {}
+  constructor(
+    private readonly service: ProductService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  @EventPattern({ cmd: 'product_created' })
+  @EventPattern('product.created')
   @Exempt()
   async productCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
+      () => this.service.create(data.data, data.user),
       {
-        queueName: 'product_created',
+        queueName: 'product.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_created',
+        dlqRoutingKey: 'dlq.product.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'product_updated' })
+  @EventPattern('product.updated')
   @Exempt()
   async productUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
+      () => this.service.update(data.data.id, data.data, data.user),
       {
-        queueName: 'product_updated',
+        queueName: 'product.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_updated',
+        dlqRoutingKey: 'dlq.product.updated',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'product_deleted' })
+  @EventPattern('product.deleted')
   @Exempt()
   async productDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
+      () => this.service.delete(data.data, data.user),
       {
-        queueName: 'product_deleted',
+        queueName: 'product.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_deleted',
+        dlqRoutingKey: 'dlq.product.deleted',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'product_code_generated' })
+  @EventPattern('product.code.created')
   @Exempt()
   async productCodeGenerated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.generateProductCode(data),
+      () => this.service.generateProductCode(data.data),
       {
-        queueName: 'product_code_generated',
+        queueName: 'product.code.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_code_generated',
+        dlqRoutingKey: 'dlq.product.code.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'product_code_updated' })
+  @EventPattern('product.code.updated')
   @Exempt()
   async productCodeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.updateProductCode(data.id, data),
+      () => this.service.updateProductCode(data.data.id, data.data),
       {
-        queueName: 'product_code_updated',
+        queueName: 'product.code.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_code_updated',
+        dlqRoutingKey: 'dlq.product.code.updated',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'product_code_deleted' })
+  @EventPattern('product.code.deleted')
   @Exempt()
   async productCodeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.deleteProductCode(data.id),
+      () => this.service.deleteProductCode(data.data.id),
       {
-        queueName: 'product_code_deleted',
+        queueName: 'product.code.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.product_code_deleted',
+        dlqRoutingKey: 'dlq.product.code.deleted',
+        prisma: this.prisma,
       },
     )();
   }

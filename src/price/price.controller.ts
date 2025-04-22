@@ -2,50 +2,57 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { PriceService } from './price.service';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('price')
 export class PriceController {
-  constructor(private readonly service: PriceService) {}
+  constructor(
+    private readonly service: PriceService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  @EventPattern({ cmd: 'price_created' })
+  @EventPattern('price.created')
   @Exempt()
   async priceCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
+      () => this.service.create(data.data, data.user),
       {
-        queueName: 'price_created',
+        queueName: 'price.created',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.price_created',
+        dlqRoutingKey: 'dlq.price.created',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'price_updated' })
+  @EventPattern('price.updated')
   @Exempt()
   async priceUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
+      () => this.service.update(data.data.id, data.user),
       {
-        queueName: 'price_updated',
+        queueName: 'price.updated',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.price_updated',
+        dlqRoutingKey: 'dlq.price.updated',
+        prisma: this.prisma,
       },
     )();
   }
 
-  @EventPattern({ cmd: 'price_deleted' })
+  @EventPattern('price.deleted')
   @Exempt()
   async priceDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
+      () => this.service.delete(data.data, data.user),
       {
-        queueName: 'price_deleted',
+        queueName: 'price.deleted',
         useDLQ: true,
-        dlqRoutingKey: 'dlq.price_deleted',
+        dlqRoutingKey: 'dlq.price.deleted',
+        prisma: this.prisma,
       },
     )();
   }

@@ -10,7 +10,7 @@ import {
 } from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
 import { Exempt } from 'src/decorator/exempt.decorator';
-import { RmqAckHelper } from 'src/helper/rmq-ack.helper';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('voucher')
 export class VoucherController {
@@ -153,7 +153,7 @@ export class VoucherController {
   @EventPattern({ cmd: 'purchase_voucher' })
   @Exempt()
   async deleteUser(@Payload() data: any, @Ctx() context: RmqContext) {
-    await RmqAckHelper.handleMessageProcessing(
+    await RmqHelper.handleMessageProcessing(
       context,
       async () => {
         console.log(data);
