@@ -1004,7 +1004,7 @@ export class TransactionService extends BaseService {
 
       const store = await this.prisma.store.findUnique({
         where: { id: String(data.storeId) },
-        select: { code: true },
+        select: { code: true, tax_percentage: true },
       });
       const count = await this.prisma.transaction.count({
         where: { store_id: String(data.storeId) },
@@ -1032,6 +1032,7 @@ export class TransactionService extends BaseService {
             tax_price: data.taxAmount,
             payment_link: paymentLink,
             poin_earned: data.poin_earned,
+            tax_percent: store.tax_percentage,
             expired_at: expiredAt,
             store: { connect: { id: String(data.storeId) } },
             customer: { connect: { id: String(data.customerId) } },
