@@ -170,4 +170,51 @@ export class VoucherService {
 
     return deletedVoucher;
   }
+
+  //handle replica
+  async createReplica(data: any): Promise<any> {
+    return this.prisma.voucher.create({
+      data: {
+        id: data.id,
+        name: data.name,
+        code: data.code,
+        discount_amount: new Decimal(data.discount_amount),
+        max_discount: new Decimal(data.max_discount),
+        min_purchase: new Decimal(data.min_purchase),
+        poin_price: data.poin_price,
+        description: data.description,
+        start_date: new Date(data.start_date),
+        end_date: new Date(data.end_date),
+        is_active: data.is_active,
+        store_id: data.store_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      },
+    });
+  }
+  async updateReplica(id: string, data: any): Promise<any> {
+    return this.prisma.voucher.update({
+      where: { id },
+      data: {
+        name: data.name,
+        discount_amount: new Decimal(data.discount_amount),
+        max_discount: new Decimal(data.max_discount),
+        min_purchase: new Decimal(data.min_purchase),
+        poin_price: data.poin_price,
+        description: data.description,
+        start_date: new Date(data.start_date),
+        end_date: new Date(data.end_date),
+        is_active: data.is_active,
+        store_id: data.store_id,
+        updated_at: new Date(),
+      },
+    });
+  }
+
+  async deleteReplica(id: string): Promise<any> {
+    return this.prisma.voucher.update({
+      where: { id },
+      data: { deleted_at: new Date() },
+    });
+  }
 }

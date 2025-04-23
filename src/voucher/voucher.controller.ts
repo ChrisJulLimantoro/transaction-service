@@ -73,10 +73,11 @@ export class VoucherController {
   async create(@Payload() data: any): Promise<any> {
     try {
       const result = await this.voucherService.create(data.body);
-      this.marketplaceClient.emit(
-        { module: 'voucher', action: 'create' },
-        result,
-      );
+      // this.marketplaceClient.emit(
+      //   { module: 'voucher', action: 'create' },
+      //   result,
+      // );
+      RmqHelper.publishEvent('voucher.created', result);
       return {
         success: true,
         message: 'Success Create Voucher!',
@@ -92,6 +93,21 @@ export class VoucherController {
       };
     }
   }
+  @EventPattern('voucher.created')
+  async createReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Voucher Create Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.voucherService.createReplica(data);
+      },
+      {
+        queueName: 'voucher.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.voucher.created',
+      },
+    )();
+  }
 
   @MessagePattern({ cmd: 'put:voucher/*' })
   @Describe({ description: 'Update Voucher', fe: ['marketplace/voucher:edit'] })
@@ -101,10 +117,11 @@ export class VoucherController {
     const body = data.body;
     try {
       const result = await this.voucherService.update(param.id, body);
-      this.marketplaceClient.emit(
-        { module: 'voucher', action: 'update' },
-        result,
-      );
+      // this.marketplaceClient.emit(
+      //   { module: 'voucher', action: 'update' },
+      //   result,
+      // );
+      RmqHelper.publishEvent('voucher.updated', result);
       return {
         success: true,
         message: 'Success Update Voucher!',
@@ -121,6 +138,22 @@ export class VoucherController {
     }
   }
 
+  @EventPattern('voucher.updated')
+  async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Voucher Update Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.voucherService.updateReplica(data.id, data);
+      },
+      {
+        queueName: 'voucher.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.voucher.updated',
+      },
+    )();
+  }
+
   @MessagePattern({ cmd: 'delete:voucher/*' })
   @Describe({
     description: 'Soft Delete Voucher',
@@ -130,10 +163,11 @@ export class VoucherController {
     const param = data.params;
     try {
       const result = await this.voucherService.softDelete(param.id);
-      this.marketplaceClient.emit(
-        { module: 'voucher', action: 'delete' },
-        result,
-      );
+      // this.marketplaceClient.emit(
+      //   { module: 'voucher', action: 'delete' },
+      //   result,
+      // );
+      RmqHelper.publishEvent('voucher.deleted', result);
       return {
         success: true,
         message: 'Success Delete Voucher!',
@@ -148,6 +182,22 @@ export class VoucherController {
         statusCode: 500,
       };
     }
+  }
+
+  @EventPattern('voucher.deleted')
+  async deleteReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Voucher Deleted Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.voucherService.deleteReplica(data.id);
+      },
+      {
+        queueName: 'voucher.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.voucher.deleted',
+      },
+    )();
   }
 
   @EventPattern({ cmd: 'purchase_voucher' })
