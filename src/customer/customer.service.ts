@@ -8,7 +8,14 @@ export class CustomerService {
 
   async register(data: any): Promise<any> {
     const user = await this.prismaService.customer.create({
-      data: data,
+      data: {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        is_verified: data.is_verified,
+        device_token: data.deviceTokens,
+      },
     });
     return user;
   }

@@ -9,65 +9,104 @@ import {
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { CustomerService } from './customer.service';
 import { Describe } from 'src/decorator/describe.decorator';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('customer')
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
-  @EventPattern({ cmd: 'user_register' })
+  @EventPattern('customer.register')
   @Exempt()
   async registerCustomer(@Payload() data: any, @Ctx() context: RmqContext) {
-    console.log('Creating user', data.id);
-    const response = await this.customerService.register(data);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return response;
+    console.log('Captured Customer Created Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.customerService.register(data);
+      },
+      {
+        queueName: 'customer.register',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.customer.register',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'user_verified' })
+  @EventPattern('customer.verified')
   @Exempt()
   async verifyCustomer(@Payload() data: any, @Ctx() context: RmqContext) {
-    const response = await this.customerService.verifyUser(data);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return response;
+    console.log('Captured Customer Verified Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        const response = await this.customerService.verifyUser(data);
+        return response;
+      },
+      {
+        queueName: 'customer.verified',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.customer.verified',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'update_profile' })
+  @EventPattern('customer.update_profile')
   @Exempt()
   async updateProfile(@Payload() data: any, @Ctx() context: RmqContext) {
-    const response = await this.customerService.updateProfile(data);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return response;
+    console.log('Captured Customer Update Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        const response = await this.customerService.updateProfile(data);
+        return response;
+      },
+      {
+        queueName: 'customer.update_profile',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.customer.update_profile',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'soft_delete' })
+  @EventPattern('customer.delete')
   @Exempt()
   async deleteUser(@Payload() data: any, @Ctx() context: RmqContext) {
-    const response = await this.customerService.deleteUser(data.id);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return response;
+    console.log('Captured Customer Delete Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        const response = await this.customerService.deleteUser(data.id);
+        return response;
+      },
+      {
+        queueName: 'customer.delete',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.customer.delete',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'add_device_token' })
+  @EventPattern('customer.device_token')
   @Exempt()
   async addDeviceToken(
     @Payload() data: { userId: string; deviceToken: string },
     @Ctx() context: RmqContext,
   ) {
-    const response = await this.customerService.addDeviceToken(
-      data.userId,
-      data.deviceToken,
-    );
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return response;
+    console.log('Captured Customer Device Token Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        const response = await this.customerService.addDeviceToken(
+          data.userId,
+          data.deviceToken,
+        );
+        return response;
+      },
+      {
+        queueName: 'customer.device_token',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.customer.device_token',
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'get:customer' })
