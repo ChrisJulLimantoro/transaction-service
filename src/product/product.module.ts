@@ -3,17 +3,11 @@ import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { ProductRepository } from 'src/repositories/product.repository';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionModule } from 'src/transaction/transaction.module';
 
 @Module({
   imports: [TransactionModule],
   controllers: [ProductController],
-  providers: [
-    ProductService,
-    ProductRepository,
-    ProductCodeRepository,
-    PrismaService,
-  ],
+  providers: [ProductService, ProductRepository, ProductCodeRepository, ,],
 })
 export class ProductModule {}
