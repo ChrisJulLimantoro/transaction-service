@@ -8,6 +8,6 @@ import { TransactionModule } from 'src/transaction/transaction.module';
 @Module({
   imports: [TransactionModule],
   controllers: [ProductController],
-  providers: [ProductService, ProductRepository, ProductCodeRepository, ,],
+  providers: [ProductService, ProductRepository, ProductCodeRepository],
 })
 export class ProductModule {}

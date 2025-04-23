@@ -5,7 +5,7 @@ import { UserRepository } from '../repositories/user.repository';
 import { SharedModule } from 'src/shared.module';
 
 @Module({
-  imports: [, SharedModule],
+  imports: [SharedModule],
   controllers: [UserController],
   providers: [UserService, UserRepository],
 })
