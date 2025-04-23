@@ -20,7 +20,7 @@ export class BaseRepository<T> {
     const prismaClient = tx ?? this.prisma;
     const created = await prismaClient[this.modelName].create({
       data,
-      include: this.relations,
+      // include: this.relations,
     });
     await this.actionLog(
       this.modelName,

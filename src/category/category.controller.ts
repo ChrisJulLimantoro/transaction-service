@@ -15,6 +15,7 @@ export class CategoryController {
   @EventPattern('category.created')
   @Exempt()
   async categoryCreated(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('category.created', data);
     await RmqHelper.handleMessageProcessing(
       context,
       () => this.service.create(data.data, data.user),
