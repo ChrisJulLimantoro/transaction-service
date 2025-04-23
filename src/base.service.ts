@@ -21,7 +21,7 @@ export abstract class BaseService {
   async create(data: any, user_id?: string): Promise<CustomResponse> {
     data = this.transformCreateData(data);
     const validatedData = this.validation.validate(data, this.createSchema);
-    const newData = await this.repository.create(validatedData, user_id);
+    const newData = await this.repository.create(validatedData, null, user_id);
     if (!newData) {
       return CustomResponse.error('Failed to create new data', null, 500);
     }
@@ -91,7 +91,7 @@ export abstract class BaseService {
     if (!data) {
       return CustomResponse.error('Data not found', null, 404);
     }
-    await this.repository.delete(id, user_id);
+    await this.repository.delete(id, null, user_id);
     return CustomResponse.success('Data deleted!', data, 200);
   }
 
