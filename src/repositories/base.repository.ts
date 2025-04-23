@@ -166,6 +166,7 @@ export class BaseRepository<T> {
     const updated = await prismaClient[this.modelName].update({
       where: this.isSoftDelete ? { id, deleted_at: null } : { id },
       data,
+      include: this.relations,
     });
     const diff = this.getDiff(before, updated);
     await this.actionLog(this.modelName, id, 'UPDATE', diff, user_id, tx);
@@ -184,10 +185,12 @@ export class BaseRepository<T> {
       return prismaClient[this.modelName].update({
         where: { id },
         data: { deleted_at: new Date(), updated_at: new Date() },
+        include: this.relations,
       });
     }
     return prismaClient[this.modelName].delete({
       where: { id },
+      include: this.relations,
     });
   }
 
