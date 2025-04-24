@@ -38,4 +38,38 @@ export class BankService {
       data: { deleted_at: new Date() },
     });
   }
+
+  async createReplica(data: any) {
+    return this.prisma.bankAccount.create({
+      data: {
+        id: data.id,
+        store_id: data.store_id,
+        bank_name: data.bank_name,
+        account_number: data.account_number,
+        account_holder: data.account_holder,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      },
+    });
+  }
+
+  async deleteReplica(id: string) {
+    return this.prisma.bankAccount.update({
+      where: { id },
+      data: { deleted_at: new Date() },
+    });
+  }
+
+  async updateReplica(id: string, data: any) {
+    return this.prisma.bankAccount.update({
+      where: { id },
+      data: {
+        store_id: data.store_id,
+        bank_name: data.bank_name,
+        account_number: data.account_number,
+        account_holder: data.account_holder,
+        updated_at: new Date(), // atau gunakan data.updated_at jika disertakan
+      },
+    });
+  }
 }

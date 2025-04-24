@@ -1,7 +1,14 @@
 import { Controller } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import {
+  Ctx,
+  EventPattern,
+  MessagePattern,
+  Payload,
+  RmqContext,
+} from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
 import { BankService } from './bank.service';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('bank_account')
 export class BankController {
@@ -68,6 +75,7 @@ export class BankController {
     try {
       console.log(data.body);
       const result = await this.bankAccountService.create(data.body);
+      RmqHelper.publishEvent('bank_account.created', result);
       return {
         success: true,
         message: 'Success Create Bank Account!',
@@ -84,6 +92,25 @@ export class BankController {
     }
   }
 
+  @EventPattern('bank_account.created')
+  async createBankAccountReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    console.log('Captured Bank Account Create Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.bankAccountService.createReplica(data);
+      },
+      {
+        queueName: 'bank_account.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.bank_account.created',
+      },
+    )();
+  }
+
   @MessagePattern({ cmd: 'put:bank_account/*' })
   @Describe({
     description: 'Update Bank Account',
@@ -94,6 +121,7 @@ export class BankController {
     const body = data.body;
     try {
       const result = await this.bankAccountService.update(param.id, body);
+      RmqHelper.publishEvent('bank_account.updated', result);
       return {
         success: true,
         message: 'Success Update Bank Account!',
@@ -110,6 +138,22 @@ export class BankController {
     }
   }
 
+  @EventPattern('bank_account.updated')
+  async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Bank Account Update Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.bankAccountService.updateReplica(data.id, data);
+      },
+      {
+        queueName: 'bank_account.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.bank_account.updated',
+      },
+    )();
+  }
+
   @MessagePattern({ cmd: 'delete:bank_account/*' })
   @Describe({
     description: 'Soft Delete Bank Account',
@@ -119,6 +163,7 @@ export class BankController {
     const param = data.params;
     try {
       const result = await this.bankAccountService.softDelete(param.id);
+      RmqHelper.publishEvent('bank_account.deleted', result);
       return {
         success: true,
         message: 'Success Delete Bank Account!',
@@ -133,5 +178,24 @@ export class BankController {
         statusCode: 500,
       };
     }
+  }
+
+  @EventPattern('bank_account.deleted')
+  async deleteBankAccountReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    console.log('Captured Bank Account Delete Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.bankAccountService.deleteReplica(data.id);
+      },
+      {
+        queueName: 'bank_account.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.bank_account.deleted',
+      },
+    )();
   }
 }
