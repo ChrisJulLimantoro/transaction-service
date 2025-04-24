@@ -200,7 +200,7 @@ export class VoucherController {
     )();
   }
 
-  @EventPattern({ cmd: 'purchase_voucher' })
+  @EventPattern('voucher.purchased')
   @Exempt()
   async deleteUser(@Payload() data: any, @Ctx() context: RmqContext) {
     await RmqHelper.handleMessageProcessing(
