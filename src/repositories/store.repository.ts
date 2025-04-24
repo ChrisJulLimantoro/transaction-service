@@ -17,7 +17,9 @@ export class StoreRepository extends BaseRepository<any> {
           created_at: 'desc',
         },
       },
-      BankAccount: true,
+      BankAccount: {
+        where: { deleted_at: null },
+      },
       products: {
         where: {
           deleted_at: null,

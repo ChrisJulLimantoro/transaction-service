@@ -147,4 +147,32 @@ export class PayoutService {
       orderBy: { created_at: 'desc' },
     });
   }
+
+  async createReplica(data: any) {
+    return this.prisma.payoutRequest.create({
+      data: {
+        id: data.id,
+        store_id: data.store_id,
+        bank_account_id: data.bank_account_id,
+        amount: data.amount,
+        status: data.status,
+        information: data.information,
+        created_at: new Date(data.created_at),
+        updated_at: new Date(data.updated_at),
+      },
+    });
+  }
+
+  async updateReplica(id: string, data: any) {
+    return this.prisma.payoutRequest.update({
+      where: { id },
+      data: {
+        status: data.status,
+        proof: data.proof,
+        approved_at: data.approved_at ? new Date(data.approved_at) : null,
+        information: data.information,
+        updated_at: new Date(data.updated_at),
+      },
+    });
+  }
 }
