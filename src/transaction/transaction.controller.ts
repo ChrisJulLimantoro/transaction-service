@@ -15,6 +15,7 @@ import { channel } from 'diagnostics_channel';
 import { Describe } from 'src/decorator/describe.decorator';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { CustomResponse } from 'src/exception/dto/custom-response.dto';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('transaction')
 export class TransactionController {
@@ -183,11 +184,37 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response.success) {
-      this.marketplaceClient.emit('transaction_operational_created', response);
+      RmqHelper.publishEvent('transaction.created', {
+        data: response.data,
+        user: data.params.user.id,
+      });
+      // this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
   }
 
+  @EventPattern('transaction.created')
+  @Exempt()
+  async createTransactionReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Create Event', data);
+        await this.transactionService.createReplica(data.data, data.user);
+      },
+      {
+        queueName: 'transaction.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.created',
+        prisma: this.prisma,
+      },
+    )();
+  }
+
+  //TODO: change to PUBSUB
   @MessagePattern({ cmd: 'post:transaction-detail' })
   @Describe({
     description: 'Create Transaction Detail',
@@ -204,9 +231,34 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response) {
-      this.marketplaceClient.emit('transaction_product_created', response.data);
+      RmqHelper.publishEvent('transaction.detail.created', {
+        data: response.data,
+        user: data.params.user.id,
+      });
+      // this.marketplaceClient.emit('transaction_product_created', response.data);
     }
     return response;
+  }
+
+  @EventPattern('transaction.detail.created')
+  @Exempt()
+  async createTransactionDetailReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Detail Create Event', data);
+        await this.transactionService.createDetailReplica(data.data, data.user);
+      },
+      {
+        queueName: 'transaction.detail.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.detail.created',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'put:transaction/*' })
@@ -227,12 +279,41 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response) {
-      this.marketplaceClient.emit(
-        'transaction_operational_updated',
-        response.data,
-      );
+      RmqHelper.publishEvent('transaction.updated', {
+        data: response.data,
+        user: data.params.user.id,
+      });
+      // this.marketplaceClient.emit(
+      //   'transaction_operational_updated',
+      //   response.data,
+      // );
     }
     return response;
+  }
+
+  @EventPattern('transaction.updated')
+  @Exempt()
+  async updateTransactionReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Update Event', data);
+        return await this.transactionService.update(
+          data.data.id,
+          data.data,
+          data.user,
+        );
+      },
+      {
+        queueName: 'transaction.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.updated',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'put:transaction-detail/*' })
@@ -253,9 +334,41 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response) {
-      this.marketplaceClient.emit('transaction_detail_updated', response.data);
+      RmqHelper.publishEvent('transaction.detail.updated', {
+        data: response.data.updatedDetail,
+        user: data.params.user.id,
+      });
+      RmqHelper.publishEvent('transaction.updated', {
+        data: response.data.syncResult,
+        user: data.params.user.id,
+      });
+      // this.marketplaceClient.emit('transaction_detail_updated', response.data);
     }
     return response;
+  }
+
+  @EventPattern('transaction.detail.updated')
+  @Exempt()
+  async updateTransactionDetailReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Detail Update Event', data);
+        return await this.transactionService.updateDetailReplica(
+          data.data,
+          data.user,
+        );
+      },
+      {
+        queueName: 'transaction.detail.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.detail.updated',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'delete:transaction/*' })
@@ -274,9 +387,34 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response) {
-      this.marketplaceClient.emit('transaction_deleted', { id: id });
+      RmqHelper.publishEvent('transaction.deleted', {
+        id: id,
+        user: data.params.user.id,
+      });
+      // this.marketplaceClient.emit('transaction_deleted', { id: id });
     }
     return response;
+  }
+
+  @EventPattern('transaction.deleted')
+  @Exempt()
+  async deleteTransactionReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Delete Event', data);
+        return await this.transactionService.deleteReplica(data.id, data.user);
+      },
+      {
+        queueName: 'transaction.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.deleted',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'delete:transaction-detail/*' })
@@ -295,12 +433,41 @@ export class TransactionController {
       data.params.user.id,
     );
     if (response) {
-      this.marketplaceClient.emit('transaction_detail_deleted', {
+      RmqHelper.publishEvent('transaction.detail.deleted', {
         id: id,
         data: response.data,
+        user: data.params.user.id,
       });
+      // this.marketplaceClient.emit('transaction_detail_deleted', {
+      //   id: id,
+      //   data: response.data,
+      // });
     }
     return response;
+  }
+
+  @EventPattern('transaction.detail.deleted')
+  @Exempt()
+  async deleteTransactionDetailReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Detail Delete Event', data);
+        return await this.transactionService.deleteDetailReplica(
+          data.id,
+          data.user,
+        );
+      },
+      {
+        queueName: 'transaction.detail.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.detail.deleted',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   @MessagePattern({ cmd: 'put:transaction-approve/*' })
@@ -341,6 +508,11 @@ export class TransactionController {
         'res di trans acpprove sales',
         res.data.transaction_products[0],
       );
+      RmqHelper.publishEvent('transaction.status.updated', {
+        id: params.id,
+        status: newstatus,
+        user: data.params.user.id,
+      });
       this.financeClient.emit({ cmd: 'transaction_approved' }, res);
     }
     return res;
@@ -381,9 +553,39 @@ export class TransactionController {
       data.params.user.id,
     );
     if (res.success) {
-      this.financeClient.emit({ cmd: 'transaction_disapproved' }, res);
+      RmqHelper.publishEvent('transaction.status.updated', {
+        id: params.id,
+        status: newstatus,
+        user: data.params.user.id,
+      });
+      // this.financeClient.emit({ cmd: 'transaction_disapproved' }, res);
     }
     return res;
+  }
+
+  @EventPattern('transaction.status.updated')
+  @Exempt()
+  async transactionStatusUpdated(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Transaction Status Update Event', data);
+        return await this.transactionService.updateStatus(
+          data.id,
+          data.status,
+          data.user,
+        );
+      },
+      {
+        queueName: 'transaction.status.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.status.updated',
+        prisma: this.prisma,
+      },
+    )();
   }
 
   // Marketplace Endpoint

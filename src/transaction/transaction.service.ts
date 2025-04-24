@@ -18,6 +18,7 @@ import { PdfService } from './pdf.service';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -179,6 +180,44 @@ export class TransactionService extends BaseService {
     return CustomResponse.success('Transaction created successfully', data);
   }
 
+  async createReplica(data: any, user_id?: string) {
+    // Check if already exist
+    const transactionCheck = await this.repository.findOne(data.id);
+    if (transactionCheck) {
+      throw new Error('Transaction already exists');
+    }
+    // Create transaction first
+    const createData = { ...data };
+    createData.delete('transaction_details');
+    const transaction = await this.repository.create(createData, null, user_id);
+    if (!transaction) {
+      throw new Error('Failed to create transaction');
+    }
+    // Create transaction details
+    const transactionDetails = data['transaction_details'];
+    for (const detail of transactionDetails) {
+      if (detail['type'] == 'Operation') {
+        const td = await this.transactionOperationRepository.create(
+          detail,
+          null,
+          user_id,
+        );
+        if (!td) {
+          throw new Error('Failed to create transaction detail');
+        }
+      } else {
+        const td = await this.transactionProductRepository.create(
+          detail,
+          null,
+          user_id,
+        );
+        if (!td) {
+          throw new Error('Failed to create transaction detail');
+        }
+      }
+    }
+  }
+
   async update(
     id: string,
     data: any,
@@ -259,13 +298,20 @@ export class TransactionService extends BaseService {
       );
       console.log('code', code);
       // Broadcast the update to other services
-      this.inventoryClient.emit(
-        { cmd: 'product_code_updated' },
-        {
+      RmqHelper.publishEvent('product.code.updated', {
+        data: {
           id: code.id,
           status: code.status,
         },
-      );
+        user: user_id,
+      });
+      // this.inventoryClient.emit(
+      //   { cmd: 'product_code_updated' },
+      //   {
+      //     id: code.id,
+      //     status: code.status,
+      //   },
+      // );
     } else if (data.detail_type == 'operation') {
       data.total_price = data.unit * data.price + data.adjustment_price;
       const transactionDetail = new CreateTransactionOperationRequest(data);
@@ -304,6 +350,39 @@ export class TransactionService extends BaseService {
       result,
       201,
     );
+  }
+
+  async createDetailReplica(data: any, user_id?: string) {
+    // Check if already exist
+    if (data.type == 'Operation') {
+      const tdc = await this.transactionOperationRepository.findOne(data.id);
+      if (tdc) {
+        throw new Error('Transaction Detail already exists');
+      }
+      // Create transaction detail first
+      const created = await this.transactionOperationRepository.create(
+        data,
+        null,
+        user_id,
+      );
+      if (!created) {
+        throw new Error('Failed to create transaction detail');
+      }
+    } else {
+      const tpc = await this.transactionProductRepository.findOne(data.id);
+      if (tpc) {
+        throw new Error('Transaction Detail already exists');
+      }
+      // Create transaction detail first
+      const created = await this.transactionProductRepository.create(
+        data,
+        null,
+        user_id,
+      );
+      if (!created) {
+        throw new Error('Failed to create transaction detail');
+      }
+    }
   }
 
   async updateDetail(
@@ -373,6 +452,41 @@ export class TransactionService extends BaseService {
       updatedDetail,
       syncResult,
     });
+  }
+
+  async updateDetailReplica(data: any, user_id?: string) {
+    // Check if already exist
+    if (data.type == 'Operation') {
+      const tdc = await this.transactionOperationRepository.findOne(data.id);
+      if (!tdc) {
+        throw new Error('Transaction Detail not exist');
+      }
+      // Create transaction detail first
+      const updated = await this.transactionOperationRepository.update(
+        data.id,
+        data,
+        null,
+        user_id,
+      );
+      if (!updated) {
+        throw new Error('Failed to create transaction detail');
+      }
+    } else {
+      const tpc = await this.transactionProductRepository.findOne(data.id);
+      if (!tpc) {
+        throw new Error('Transaction Detail not exists');
+      }
+      // Create transaction detail first
+      const updated = await this.transactionProductRepository.update(
+        data.id,
+        data,
+        null,
+        user_id,
+      );
+      if (!updated) {
+        throw new Error('Failed to create transaction detail');
+      }
+    }
   }
 
   async updateAdjust(data: any): Promise<number> {
@@ -454,14 +568,49 @@ export class TransactionService extends BaseService {
           },
         );
         // Broadcast the update to other services
-        this.inventoryClient.emit(
-          { cmd: 'product_code_updated' },
-          {
+        RmqHelper.publishEvent('product.code.updated', {
+          data: {
             id: code.id,
             status: code.status,
           },
-        );
+          user: user_id,
+        });
+        // this.inventoryClient.emit(
+        //   { cmd: 'product_code_updated' },
+        //   {
+        //     id: code.id,
+        //     status: code.status,
+        //   },
+        // );
       }
+    } else {
+      await this.transactionOperationRepository.delete(id, null, user_id);
+    }
+
+    const updated = await this.syncDetail(
+      product ? product.transaction_id : operation.transaction_id,
+      user_id,
+    );
+
+    return CustomResponse.success(
+      'Transaction Detail deleted successfully',
+      updated,
+    );
+  }
+
+  async deleteDetailReplica(id: string, user_id?: string) {
+    const product = await this.transactionProductRepository.findOne(id);
+    const operation = await this.transactionOperationRepository.findOne(id);
+
+    if (!product && !operation) {
+      return CustomResponse.error('Transaction Detail not found', null, 404);
+    }
+
+    if (product) {
+      if (product.product_code.status == 2 && product.transaction_type == 1) {
+        return CustomResponse.error('Product Already bought back', null, 400);
+      }
+      await this.transactionProductRepository.delete(id, null, user_id);
     } else {
       await this.transactionOperationRepository.delete(id, null, user_id);
     }
@@ -595,14 +744,105 @@ export class TransactionService extends BaseService {
             console.log('code deleted', code);
 
             // Broadcast update after transaction commits
-            this.inventoryClient.emit(
-              { cmd: 'product_code_updated' },
-              {
+            RmqHelper.publishEvent('product.code.updated', {
+              data: {
                 id: code.id,
                 status: code.status,
               },
+              user: user_id,
+            });
+            // this.inventoryClient.emit(
+            //   { cmd: 'product_code_updated' },
+            //   {
+            //     id: code.id,
+            //     status: code.status,
+            //   },
+            // );
+          }
+        }
+
+        for (const detail of transactionOperation) {
+          await this.transactionOperationRepository.delete(
+            detail.id,
+            tx,
+            user_id,
+          );
+        }
+
+        return await this.repository.delete(id, tx, user_id);
+      });
+
+      // PUT it Outside of transaction
+      if (transaction.nota_link != null) {
+        const filePath = path.join(
+          this.storagePath,
+          `${transaction.nota_link}`,
+        );
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.error('Error deleting file:', err);
+          } else {
+            console.log('File deleted successfully:', filePath);
+          }
+        });
+      }
+
+      return CustomResponse.success(
+        'Transaction deleted successfully',
+        dataDeleted,
+      );
+    } catch (error) {
+      console.error('Failed to delete transaction:', error);
+      return CustomResponse.error(error.message, null, 500);
+    }
+  }
+
+  async deleteReplica(id: string, user_id?: string) {
+    const transaction = await this.repository.findOne(id);
+    if (!transaction) {
+      return CustomResponse.error('Transaction not found', null, 404);
+    }
+    if (
+      transaction.payment_link != null &&
+      transaction.status != 0 &&
+      transaction.status != 1 &&
+      transaction.status != -1
+    ) {
+      return CustomResponse.error(
+        'Marketplace transactions cannot be deleted in settlement status',
+        null,
+        404,
+      );
+    }
+
+    const transactionProduct = await this.prisma.transactionProduct.findMany({
+      where: { transaction_id: id },
+      include: { product_code: true },
+    });
+
+    const transactionOperation =
+      await this.prisma.transactionOperation.findMany({
+        where: { transaction_id: id },
+      });
+
+    try {
+      const dataDeleted = await this.prisma.$transaction(async (tx) => {
+        for (const detail of transactionProduct) {
+          if (
+            detail.product_code != null &&
+            detail.product_code.status == 2 &&
+            transaction.transaction_type == 1
+          ) {
+            throw new Error(
+              'Product Already bought back, failed to delete transaction!',
             );
           }
+
+          await this.transactionProductRepository.delete(
+            detail.id,
+            tx,
+            user_id,
+          );
         }
 
         for (const detail of transactionOperation) {
@@ -1101,13 +1341,20 @@ export class TransactionService extends BaseService {
             where: { id: item.id },
             data: { status: 1 },
           });
-          this.inventoryClient.emit(
-            { cmd: 'product_code_updated' },
-            {
+          // this.inventoryClient.emit(
+          //   { cmd: 'product_code_updated' },
+          //   {
+          //     id: item.id,
+          //     status: 1,
+          //   },
+          // );
+          RmqHelper.publishEvent('product.code.updated', {
+            data: {
               id: item.id,
               status: 1,
             },
-          );
+            user: null,
+          });
         }
 
         // **4. Update Voucher Jika Digunakan**
@@ -1271,13 +1518,20 @@ export class TransactionService extends BaseService {
       });
 
       // Emit event ke inventory
-      this.inventoryClient.emit(
-        { cmd: 'product_code_updated' },
-        {
+      RmqHelper.publishEvent('product.code.updated', {
+        data: {
           id: item.id,
           status: 1,
         },
-      );
+        user: null,
+      });
+      // this.inventoryClient.emit(
+      //   { cmd: 'product_code_updated' },
+      //   {
+      //     id: item.id,
+      //     status: 1,
+      //   },
+      // );
     }
   }
 
