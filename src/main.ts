@@ -43,6 +43,7 @@ async function bootstrap() {
     'account.*',
     'bank_account.*',
     'voucher.*',
+    'payout.*',
   ];
   await RmqHelper.setupSubscriptionQueue(queueName, routingKeys);
 

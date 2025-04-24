@@ -40,6 +40,7 @@ export class PayoutController {
   })
   async getAllPayoutRequests(): Promise<any> {
     try {
+      console.log('masuk pak!');
       const result = await this.payoutService.getAllPayoutRequests();
       return {
         success: true,
