@@ -1,7 +1,8 @@
 import { Controller } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { Ctx, EventPattern, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Describe } from 'src/decorator/describe.decorator';
 import { PayoutService } from './payout.service';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('payout')
 export class PayoutController {
@@ -15,6 +16,7 @@ export class PayoutController {
   async requestPayout(@Payload() data: any): Promise<any> {
     try {
       const result = await this.payoutService.createPayout(data.body);
+      RmqHelper.publishEvent('payout.created', result);
       return {
         success: true,
         message: 'Payout request submitted successfully!',
@@ -65,7 +67,7 @@ export class PayoutController {
       const { proofUrl } = data.body;
 
       const result = await this.payoutService.saveProof(id, proofUrl);
-
+      RmqHelper.publishEvent('payout.updated', result);
       return {
         success: true,
         message: 'Payout request updated successfully!',
@@ -130,5 +132,37 @@ export class PayoutController {
         statusCode: 500,
       };
     }
+  }
+
+  @EventPattern('payout.created')
+  async createReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Payout Created Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.payoutService.createReplica(data);
+      },
+      {
+        queueName: 'payout.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.payout.created',
+      },
+    )();
+  }
+
+  @EventPattern('payout.updated')
+  async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
+    console.log('Captured Payout Updated Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.payoutService.updateReplica(data.id, data);
+      },
+      {
+        queueName: 'payout.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.payout.updated',
+      },
+    )();
   }
 }
