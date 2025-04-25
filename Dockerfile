@@ -20,7 +20,7 @@ RUN npm run build
 RUN ls -la /app/dist
 
 # Expose API port
-EXPOSE 3001
+# EXPOSE 3004
 
 # Ensure Prisma Client is generated & migrations are applied before starting
 # CMD ["npm","run","start:prod"]
