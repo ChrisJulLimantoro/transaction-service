@@ -48,6 +48,7 @@ async function bootstrap() {
     'voucher.*',
     'payout.*',
     'product.code.*',
+    'review.*',
   ];
   await RmqHelper.setupSubscriptionQueue(queueName, routingKeys);
 
