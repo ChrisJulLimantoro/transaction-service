@@ -1038,6 +1038,7 @@ export class TransactionService extends BaseService {
   async processMidtransNotification(query: any): Promise<any> {
     try {
       const { transaction_status, order_id } = query;
+      console.log('MIDTRANS NOTIF ' + query);
 
       const transaction = await this.prisma.transaction.findUnique({
         where: { id: order_id },
@@ -1075,18 +1076,13 @@ export class TransactionService extends BaseService {
             information: `Pemasukan dari transaksi #${transaction.code}`,
           },
         });
-
-        this.marketplaceClient.emit('transaction_settlement', {
+        RmqHelper.publishEvent('transaction.marketplace.settlement', {
           id: transaction.id,
         });
-        this.authClient.emit(
-          { cmd: 'transaction_settlement' },
-          {
-            store_id: transaction.store_id,
-            transaction_code: transaction.code,
-          },
-        );
-
+        RmqHelper.publishEvent('transaction.auth.settlement', {
+          store_id: transaction.store_id,
+          transaction_code: transaction.code,
+        });
         return {
           success: true,
           redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
@@ -1099,6 +1095,7 @@ export class TransactionService extends BaseService {
         transaction_status === 'expire' ||
         transaction_status === 'cancel' ||
         transaction_status === 'failure' ||
+        transaction_status === 'pending' ||
         transaction_status === null
       ) {
         console.log(
@@ -1151,29 +1148,23 @@ export class TransactionService extends BaseService {
               data: { status: 0 }, // Set status to Available
             });
 
-            // 🔥 Emit product status update to inventory service
-            this.inventoryClient.emit(
-              { cmd: 'product_code_updated' },
-              {
+            RmqHelper.publishEvent('product.code.updated', {
+              data: {
                 id: item.product_code_id,
                 status: 0,
               },
-            );
+              user: null,
+            });
           }
         });
 
-        this.marketplaceClient.emit('transaction_failed', {
+        RmqHelper.publishEvent('transaction.marketplace.failed', {
           id: transaction.id,
         });
-
-        this.authClient.emit(
-          { cmd: 'transaction_failed' },
-          {
-            store_id: transaction.store_id,
-            transaction_code: transaction.code,
-          },
-        );
-
+        RmqHelper.publishEvent('transaction.auth.failed', {
+          store_id: transaction.store_id,
+          transaction_code: transaction.code,
+        });
         return {
           success: false,
           message: `Transaction ${order_id} has been soft deleted, and products restored.`,
@@ -1196,16 +1187,6 @@ export class TransactionService extends BaseService {
   async processMarketplaceTransaction(data: any, context: RmqContext) {
     try {
       console.log('Processing transaction:', data);
-
-      if (
-        !data.orderId ||
-        !data.grossAmount ||
-        !data.items ||
-        !data.customerDetails ||
-        !data.taxAmount
-      ) {
-        throw new Error('Missing required transaction details');
-      }
 
       const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -1255,6 +1236,8 @@ export class TransactionService extends BaseService {
       )
         .toString()
         .padStart(3, '0')}`;
+
+      //
 
       // 🔥 **Gunakan PrismaService yang sudah diinject**
       const result = await this.prisma.$transaction(async (tx) => {
@@ -1372,22 +1355,18 @@ export class TransactionService extends BaseService {
       const fullTransaction = await this.getFullTransactionDetails(result.id);
 
       this.generatePdf(fullTransaction.id);
-      // 📡 Emit event ke Marketplace
-      this.marketplaceClient.emit('transaction_created', {
+
+      RmqHelper.publishEvent('transaction.marketplace.created', {
         orderId: fullTransaction.id,
         paymentLink: fullTransaction.payment_link,
         status: 'waiting_payment',
         transaction: fullTransaction,
       });
 
-      this.authClient.emit(
-        { cmd: 'transaction_created' },
-        {
-          store_id: fullTransaction.store_id,
-          transaction_code: fullTransaction.code,
-        },
-      );
-
+      RmqHelper.publishEvent('transaction.auth.created', {
+        store_id: fullTransaction.store_id,
+        transaction_code: fullTransaction.code,
+      });
       return {
         success: true,
         message: 'Transaction processed successfully',
@@ -1439,7 +1418,15 @@ export class TransactionService extends BaseService {
               country_code: 'IDN',
             },
           },
-          enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
+          enabled_payments: [
+            'credit_card',
+            'bca_va',
+            'other_qris',
+            'bri_va',
+            'bni_va',
+            'gopay',
+            'shopeepay',
+          ],
           credit_card: {
             secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
           },
@@ -1559,5 +1546,227 @@ export class TransactionService extends BaseService {
       },
     });
     return fullTransaction;
+  }
+
+  async createMarketplaceReplica(transactionData: any) {
+    try {
+      console.log(
+        'Start replicate Marketplace Transaction:',
+        transactionData.id,
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        // ✅ Insert Transaction
+        await tx.transaction.create({
+          data: {
+            // id: transactionData.id,
+            date: new Date(transactionData.date),
+            code: transactionData.code + '-rep',
+            transaction_type: transactionData.transaction_type,
+            payment_method: transactionData.payment_method,
+            status: transactionData.status,
+            sub_total_price: transactionData.sub_total_price,
+            nota_link: transactionData.nota_link,
+            total_price: transactionData.total_price,
+            tax_price: transactionData.tax_price,
+            payment_link: transactionData.payment_link,
+            poin_earned: transactionData.poin_earned,
+            tax_percent: transactionData.tax_percent,
+            expired_at: new Date(transactionData.expired_at),
+            store_id: transactionData.store_id,
+            customer_id: transactionData.customer_id,
+            voucher_own_id: transactionData.voucher_own_id || undefined,
+          },
+        });
+
+        // ✅ Insert Transaction Products
+        if (transactionData.transaction_products?.length > 0) {
+          const transactionProducts = transactionData.transaction_products.map(
+            (item) => ({
+              id: item.id,
+              transaction_id: transactionData.id,
+              product_code_id: item.product_code_id,
+              name: item.name,
+              type: item.type,
+              price: item.price,
+              total_price: item.total_price,
+              transaction_type: item.transaction_type,
+              weight: item.weight,
+              adjustment_price: item.adjustment_price,
+              status: item.status,
+            }),
+          );
+
+          await tx.transactionProduct.createMany({
+            data: transactionProducts,
+          });
+        }
+
+        // ✅ Update Product Codes to status = 1
+        if (transactionData.transaction_products?.length > 0) {
+          for (const item of transactionData.transaction_products) {
+            if (
+              item.product_code_id !== 'DISCOUNT' &&
+              item.product_code_id !== 'TAX'
+            ) {
+              await tx.productCode.update({
+                where: { id: item.product_code_id },
+                data: { status: 1 },
+              });
+            }
+          }
+        }
+
+        // ✅ Update Voucher if Used
+        if (transactionData.voucher_own_id) {
+          await tx.voucherOwned.update({
+            where: { id: transactionData.voucher_own_id },
+            data: { is_used: true },
+          });
+        }
+      });
+
+      // ✅ Baru setelah semuanya sukses, Generate PDF
+      await this.generatePdf(transactionData.id);
+
+      console.log(
+        `✅ Marketplace Transaction ${transactionData.id} successfully replicated.`,
+      );
+    } catch (error) {
+      console.error(
+        '❌ Error replicating marketplace transaction:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  async marketplaceTransactionSettlementReplica(orderId: string) {
+    try {
+      console.log(
+        'Replicating Settlement for Marketplace Transaction:',
+        orderId,
+      );
+
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: orderId },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found for settlement:', orderId);
+        return;
+      }
+
+      // ✅ Update transaction to settled
+      await this.prisma.transaction.update({
+        where: { id: orderId },
+        data: {
+          status: 1, // Mark as paid/settled
+          paid_amount: transaction.total_price,
+        },
+      });
+
+      // ✅ Update store balance
+      await this.prisma.store.update({
+        where: { id: transaction.store_id },
+        data: {
+          balance: { increment: transaction.total_price },
+        },
+      });
+
+      // ✅ Create balance log
+      await this.prisma.balanceLog.create({
+        data: {
+          store_id: transaction.store_id,
+          amount: transaction.total_price,
+          type: 'INCOME',
+          information: `Pemasukan dari transaksi #${transaction.code}`,
+        },
+      });
+
+      console.log(`✅ Settlement replicated for transaction ${orderId}`);
+    } catch (error) {
+      console.error(
+        '❌ Error replicating marketplace settlement:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  async marketplaceTransactionFailedReplica(orderId: string) {
+    try {
+      console.log('Replicating Failure for Marketplace Transaction:', orderId);
+
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: orderId },
+        include: {
+          transaction_products: true,
+          transaction_operations: true,
+        },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found for failure handling:', orderId);
+        return;
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        // 🔹 Soft delete the transaction
+        await tx.transaction.update({
+          where: { id: orderId },
+          data: { deleted_at: new Date() },
+        });
+
+        // 🔹 Soft delete related transaction products
+        if (transaction.transaction_products.length > 0) {
+          await tx.transactionProduct.updateMany({
+            where: { transaction_id: orderId },
+            data: { deleted_at: new Date() },
+          });
+        }
+
+        // 🔹 Soft delete related transaction operations
+        if (transaction.transaction_operations.length > 0) {
+          await tx.transactionOperation.updateMany({
+            where: { transaction_id: orderId },
+            data: { deleted_at: new Date() },
+          });
+        }
+
+        // 🔹 If voucher was used, reset it
+        if (transaction.voucher_own_id) {
+          await tx.voucherOwned.update({
+            where: { id: transaction.voucher_own_id },
+            data: { is_used: false },
+          });
+        }
+
+        // 🔹 Restore product codes
+        for (const item of transaction.transaction_products.filter(
+          (item) =>
+            item.product_code_id !== 'DISCOUNT' &&
+            item.product_code_id !== 'TAX',
+        )) {
+          await tx.productCode.update({
+            where: { id: item.product_code_id },
+            data: { status: 0 },
+          });
+
+          RmqHelper.publishEvent('product.code.updated', {
+            data: {
+              id: item.product_code_id,
+              status: 0,
+            },
+            user: null,
+          });
+        }
+      });
+
+      console.log(`✅ Failure replicated for transaction ${orderId}`);
+    } catch (error) {
+      console.error('❌ Error replicating marketplace failure:', error.message);
+      throw error;
+    }
   }
 }
