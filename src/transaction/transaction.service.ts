@@ -1422,13 +1422,12 @@ export class TransactionService extends BaseService {
             },
           },
           enabled_payments: [
-            'credit_card',
             'bca_va',
-            'other_qris',
             'bri_va',
             'bni_va',
-            'gopay',
-            'shopeepay',
+            'permata_va',
+            'cimb_va',
+            'other_qris',
           ],
           credit_card: {
             secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
