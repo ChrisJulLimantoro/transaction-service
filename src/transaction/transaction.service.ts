@@ -1350,11 +1350,10 @@ export class TransactionService extends BaseService {
 
         return transaction;
       });
+      await this.generatePdf(result.id);
 
       // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
       const fullTransaction = await this.getFullTransactionDetails(result.id);
-
-      this.generatePdf(fullTransaction.id);
 
       RmqHelper.publishEvent('transaction.marketplace.created', {
         orderId: fullTransaction.id,
@@ -1626,8 +1625,6 @@ export class TransactionService extends BaseService {
         }
       });
 
-      // ✅ Baru setelah semuanya sukses, Generate PDF
-      await this.generatePdf(transactionData.id);
 
       console.log(
         `✅ Marketplace Transaction ${transactionData.id} successfully replicated.`,
