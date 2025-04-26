@@ -693,7 +693,6 @@ export class TransactionService extends BaseService {
     if (
       transaction.payment_link != null &&
       transaction.status != 0 &&
-      transaction.status != 1 &&
       transaction.status != -1
     ) {
       return CustomResponse.error(
