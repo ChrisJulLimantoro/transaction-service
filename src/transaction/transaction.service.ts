@@ -1055,6 +1055,11 @@ export class TransactionService extends BaseService {
         return { success: false, message: 'Transaction not found' };
       }
 
+      if (transaction.status == 1 || transaction.status == 2) {
+        console.error('Already settled!');
+        return;
+      }
+
       // ✅ SUCCESSFUL TRANSACTION HANDLING
       if (transaction_status === 'settlement' && transaction.status !== 1) {
         await this.prisma.transaction.update({
@@ -1624,7 +1629,6 @@ export class TransactionService extends BaseService {
         }
       });
 
-
       console.log(
         `✅ Marketplace Transaction ${transactionData.id} successfully replicated.`,
       );
@@ -1650,6 +1654,11 @@ export class TransactionService extends BaseService {
 
       if (!transaction) {
         console.error('Transaction not found for settlement:', orderId);
+        return;
+      }
+
+      if (transaction.status == 1) {
+        console.error('Already settled!');
         return;
       }
 
