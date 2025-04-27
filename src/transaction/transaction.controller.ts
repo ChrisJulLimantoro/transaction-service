@@ -577,11 +577,11 @@ export class TransactionController {
   }
 
   // Marketplace Endpoint
-  @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
+  @MessagePattern({ module: 'transaction', action: 'notificationTripay' })
   @Exempt()
   async handleNotification(@Payload() query: any) {
-    console.log(query);
-    return this.transactionService.processMidtransNotification(query);
+    console.log('NOTIF RECEIVED: ' + query);
+    return this.transactionService.processTripayNotification(query);
   }
 
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
