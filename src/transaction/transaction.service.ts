@@ -1545,7 +1545,7 @@ export class TransactionService extends BaseService {
     const merchantCode = 'T39590';
     const merchantRef = data.orderId;
     const amount = data.grossAmount;
-    const expiryTime = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+    const expiryTime = Math.floor(Date.now() / 1000) + 1 * 60 * 60;
 
     const signature = crypto
       .createHmac('sha256', privateKey)
