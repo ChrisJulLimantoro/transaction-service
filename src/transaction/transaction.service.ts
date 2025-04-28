@@ -1779,12 +1779,13 @@ export class TransactionService extends BaseService {
         // ✅ Insert Transaction
         await tx.transaction.create({
           data: {
-            // id: transactionData.id,
+            id: transactionData.id,
             date: new Date(transactionData.date),
-            code: transactionData.code + '-rep',
+            code: transactionData.code,
             transaction_type: transactionData.transaction_type,
             payment_method: transactionData.payment_method,
             status: transactionData.status,
+            no_ref: transactionData.no_ref,
             sub_total_price: transactionData.sub_total_price,
             nota_link: transactionData.nota_link,
             total_price: transactionData.total_price,
