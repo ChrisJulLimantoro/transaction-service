@@ -10,6 +10,7 @@ import {
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { ReviewService } from './review.service';
 import { Describe } from 'src/decorator/describe.decorator';
+import { RmqHelper } from 'src/helper/rmq.helper';
 
 @Controller('review')
 export class ReviewController {
@@ -29,10 +30,7 @@ export class ReviewController {
       data.params.id,
       data.body,
     );
-    this.marketplaceClient.emit(
-      { module: 'review', action: 'replyByAdmin' },
-      response,
-    );
+    RmqHelper.publishEvent('review.admin', response);
     return {
       data: response,
       message: 'Review added successfully!',
@@ -40,33 +38,43 @@ export class ReviewController {
       statusCode: 201,
     };
   }
-  @EventPattern({ cmd: 'give_review' })
+  @EventPattern('review.created')
   @Exempt()
   async giveReview(@Payload() data: any, @Ctx() context: RmqContext) {
-    const response = await this.reviewService.giveReview(data);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return {
-      data: response,
-      message: 'Review added successfully!',
-      success: true,
-      statusCode: 201,
-    };
+    console.log('Captured Review Created Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        const response = await this.reviewService.giveReview(data);
+        return {
+          data: response,
+          message: 'Review added successfully!',
+          success: true,
+          statusCode: 201,
+        };
+      },
+      {
+        queueName: 'review.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.review.created',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'edit_review' })
+  @EventPattern('review.updated')
   @Exempt()
   async handleReplyReview(@Payload() data: any, @Ctx() context: RmqContext) {
-    const response = await this.reviewService.editReview(data);
-    if (response) {
-      context.getChannelRef().ack(context.getMessage());
-    }
-    return {
-      data: response,
-      message: 'Review edited successfully!',
-      success: true,
-      statusCode: 201,
-    };
+    console.log('Captured Review Updated Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.reviewService.editReview(data);
+      },
+      {
+        queueName: 'review.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.review.updated',
+      },
+    )();
   }
 }

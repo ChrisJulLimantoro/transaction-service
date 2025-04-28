@@ -188,7 +188,6 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit('transaction_operational_created', response);
     }
     return response;
   }
@@ -235,7 +234,6 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit('transaction_product_created', response.data);
     }
     return response;
   }
@@ -283,10 +281,6 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit(
-      //   'transaction_operational_updated',
-      //   response.data,
-      // );
     }
     return response;
   }
@@ -342,7 +336,6 @@ export class TransactionController {
         data: response.data.syncResult,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit('transaction_detail_updated', response.data);
     }
     return response;
   }
@@ -391,7 +384,6 @@ export class TransactionController {
         id: id,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit('transaction_deleted', { id: id });
     }
     return response;
   }
@@ -438,10 +430,6 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
-      // this.marketplaceClient.emit('transaction_detail_deleted', {
-      //   id: id,
-      //   data: response.data,
-      // });
     }
     return response;
   }
@@ -596,11 +584,11 @@ export class TransactionController {
   }
 
   // Marketplace Endpoint
-  @MessagePattern({ module: 'transaction', action: 'notificationMidtrans' })
+  @MessagePattern({ module: 'transaction', action: 'notificationTripay' })
   @Exempt()
   async handleNotification(@Payload() query: any) {
-    console.log(query);
-    return this.transactionService.processMidtransNotification(query);
+    console.log('NOTIF RECEIVED: ' + query);
+    return this.transactionService.processTripayNotification(query);
   }
 
   @MessagePattern({ module: 'transaction', action: 'createTransaction' })
@@ -610,5 +598,74 @@ export class TransactionController {
     @Ctx() context: RmqContext,
   ) {
     return this.transactionService.processMarketplaceTransaction(data, context);
+  }
+
+  @EventPattern('transaction.marketplace.created')
+  @Exempt()
+  async createMarketplaceTransactionReplica(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    console.log('Captured Marketplace Transaction Create Event', data);
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        await this.transactionService.createMarketplaceReplica(
+          data.transaction,
+        );
+      },
+      {
+        queueName: 'transaction.marketplace.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.marketplace.created',
+        prisma: this.prisma,
+      },
+    )();
+  }
+
+  @EventPattern('transaction.marketplace.settlement')
+  @Exempt()
+  async marketplaceTransactionSettlement(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Marketplace Transaction Settlement Event', data);
+        await this.transactionService.marketplaceTransactionSettlementReplica(
+          data.id,
+        );
+      },
+      {
+        queueName: 'transaction.marketplace.settlement',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.marketplace.settlement',
+        prisma: this.prisma,
+      },
+    )();
+  }
+
+  @EventPattern('transaction.marketplace.failed')
+  @Exempt()
+  async marketplaceTransactionFailed(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      async () => {
+        console.log('Captured Marketplace Transaction Failed Event', data);
+        await this.transactionService.marketplaceTransactionFailedReplica(
+          data.id,
+        );
+      },
+      {
+        queueName: 'transaction.marketplace.failed',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.transaction.marketplace.failed',
+        prisma: this.prisma,
+      },
+    )();
   }
 }
