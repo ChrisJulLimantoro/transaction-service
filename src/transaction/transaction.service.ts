@@ -650,7 +650,9 @@ export class TransactionService extends BaseService {
       subtotal +=
         Number(operation.unit) * operation.price +
         parseFloat(operation.adjustment_price);
-      subtotalSales += subtotal;
+      subtotalSales +=
+        Number(operation.unit) * operation.price +
+        parseFloat(operation.adjustment_price);
       if (tax == null) {
         tax = parseFloat(operation.transaction.tax_percent);
       }
@@ -664,9 +666,13 @@ export class TransactionService extends BaseService {
         (product.weight * product.price +
           parseFloat(product.adjustment_price)) *
         suffix;
-      if (tax == null && product.transaction_type == 1) {
+      if (tax == null) {
         tax = parseFloat(product.transaction.tax_percent);
-        subtotalSales += product.weight * product.price;
+      }
+      if (product.transaction_type == 1) {
+        subtotalSales +=
+          Number(product.weight) * Number(product.price) +
+          Number(product.adjustment_price);
       }
     }
 
