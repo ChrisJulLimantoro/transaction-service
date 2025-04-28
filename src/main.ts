@@ -41,7 +41,7 @@ async function bootstrap() {
     'product.*',
     'operation.*',
     'stock.*',
-    'transaction.*',
+    'transaction.#',
     'customer.*',
     'account.*',
     'bank_account.*',
@@ -49,6 +49,8 @@ async function bootstrap() {
     'payout.*',
     'employee.*',
     'owner.*',
+    'product.code.*',
+    'review.*',
   ];
   await RmqHelper.setupSubscriptionQueue(queueName, routingKeys);
 

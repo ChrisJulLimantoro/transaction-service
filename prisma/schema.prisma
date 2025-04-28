@@ -339,6 +339,7 @@ model Transaction {
   payment_method   Int // 1: Cash, 2: Bank Transfer, 3: Credit Card, 4: Debit Card
   paid_amount      Decimal   @default(0) @db.Decimal // Current Paid Ammount
   payment_link     String? // Payment link bisa expired
+  no_ref           String? //for tripay
   poin_earned      Int       @default(0)
   expired_at       DateTime? // Expired payment link
   status           Int // 0: Draft/Pending, 1: Paid, 2: Done, -1: Cancelled

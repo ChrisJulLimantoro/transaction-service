@@ -19,6 +19,8 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RmqHelper } from 'src/helper/rmq.helper';
+import * as crypto from 'crypto';
+import * as qs from 'qs';
 
 @Injectable()
 export class TransactionService extends BaseService {
@@ -85,7 +87,7 @@ export class TransactionService extends BaseService {
       console.warn(`⛔ Expiring transaction ${trx.id}`);
 
       try {
-        await this.processMidtransNotification({
+        await this.processTripayNotification({
           transaction_status: 'expire',
           order_id: trx.id,
         });
@@ -691,18 +693,17 @@ export class TransactionService extends BaseService {
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
-    if (
-      transaction.payment_link != null &&
-      transaction.status != 0 &&
-      transaction.status != 1 &&
-      transaction.status != -1
-    ) {
-      return CustomResponse.error(
-        'Marketplace transactions cannot be deleted in settlement status',
-        null,
-        404,
-      );
-    }
+    // if (
+    //   transaction.payment_link != null &&
+    //   transaction.status != 0 &&
+    //   transaction.status != -1
+    // ) {
+    //   return CustomResponse.error(
+    //     'Marketplace transactions cannot be deleted in settlement status',
+    //     null,
+    //     404,
+    //   );
+    // }
 
     const transactionProduct = await this.prisma.transactionProduct.findMany({
       where: { transaction_id: id },
@@ -1036,177 +1037,304 @@ export class TransactionService extends BaseService {
   }
 
   // MarketPlace Transaction
-  async processMidtransNotification(query: any): Promise<any> {
+  // async processMidtransNotification(query: any): Promise<any> {
+  //   try {
+  //     const { transaction_status, order_id } = query;
+  //     console.log('MIDTRANS NOTIF ' + query);
+
+  //     const transaction = await this.prisma.transaction.findUnique({
+  //       where: { id: order_id },
+  //       include: {
+  //         store: true,
+  //         transaction_products: {
+  //           include: { product_code: true }, // Include product codes to update status
+  //         },
+  //         transaction_operations: true,
+  //       },
+  //     });
+
+  //     if (!transaction) {
+  //       console.error('Transaction not found:', order_id);
+  //       return { success: false, message: 'Transaction not found' };
+  //     }
+
+  //     if (transaction.status == 1 || transaction.status == 2) {
+  //       console.error('Already settled!');
+  //       return;
+  //     }
+
+  //     // ✅ SUCCESSFUL TRANSACTION HANDLING
+  //     if (transaction_status === 'settlement' && transaction.status !== 1) {
+  //       await this.prisma.transaction.update({
+  //         where: { id: order_id },
+  //         data: { status: 1, paid_amount: transaction.total_price },
+  //       });
+
+  //       await this.prisma.store.update({
+  //         where: { id: transaction.store_id },
+  //         data: { balance: { increment: transaction.total_price } },
+  //       });
+
+  //       await this.prisma.balanceLog.create({
+  //         data: {
+  //           store_id: transaction.store_id,
+  //           amount: transaction.total_price,
+  //           type: 'INCOME',
+  //           information: `Pemasukan dari transaksi #${transaction.code}`,
+  //         },
+  //       });
+  //       RmqHelper.publishEvent('transaction.marketplace.settlement', {
+  //         id: transaction.id,
+  //       });
+  //       RmqHelper.publishEvent('transaction.auth.settlement', {
+  //         store_id: transaction.store_id,
+  //         transaction_code: transaction.code,
+  //       });
+  //       return {
+  //         success: true,
+  //         redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
+  //       };
+  //     }
+
+  //     // ❌ FAILED TRANSACTION HANDLING (Soft Delete & Reset Voucher & Emit to Inventory)
+  //     if (
+  //       transaction_status === 'deny' ||
+  //       transaction_status === 'expire' ||
+  //       transaction_status === 'cancel' ||
+  //       transaction_status === 'failure' ||
+  //       transaction_status === 'pending' ||
+  //       transaction_status === null
+  //     ) {
+  //       console.log(
+  //         `Soft deleting transaction ${order_id} due to status: ${transaction_status}`,
+  //       );
+
+  //       await this.prisma.$transaction(async (tx) => {
+  //         // 🔹 Soft delete the transaction
+  //         await tx.transaction.update({
+  //           where: { id: order_id },
+  //           data: { deleted_at: new Date() },
+  //         });
+
+  //         // 🔹 Soft delete related transaction products
+  //         if (transaction.transaction_products.length > 0) {
+  //           await tx.transactionProduct.updateMany({
+  //             where: { transaction_id: order_id },
+  //             data: { deleted_at: new Date() },
+  //           });
+  //         }
+
+  //         // 🔹 Soft delete related transaction operations
+  //         if (transaction.transaction_operations.length > 0) {
+  //           await tx.transactionOperation.updateMany({
+  //             where: { transaction_id: order_id },
+  //             data: { deleted_at: new Date() },
+  //           });
+  //         }
+
+  //         // 🔹 If a voucher was used, mark it as "not used"
+  //         if (transaction.voucher_own_id) {
+  //           await tx.voucherOwned.update({
+  //             where: { id: transaction.voucher_own_id },
+  //             data: { is_used: false },
+  //           });
+  //         }
+
+  //         // 🔹 Restore Product Code Status (Available) & Emit to Inventory
+  //         console.log(
+  //           `Restoring product_code status for transaction: ${order_id}`,
+  //         );
+
+  //         for (const item of transaction.transaction_products.filter(
+  //           (item) =>
+  //             item.product_code_id !== 'DISCOUNT' &&
+  //             item.product_code_id !== 'TAX',
+  //         )) {
+  //           await tx.productCode.update({
+  //             where: { id: item.product_code_id },
+  //             data: { status: 0 }, // Set status to Available
+  //           });
+
+  //           RmqHelper.publishEvent('product.code.updated', {
+  //             data: {
+  //               id: item.product_code_id,
+  //               status: 0,
+  //             },
+  //             user: null,
+  //           });
+  //         }
+  //       });
+
+  //       RmqHelper.publishEvent('transaction.marketplace.failed', {
+  //         id: transaction.id,
+  //       });
+  //       RmqHelper.publishEvent('transaction.auth.failed', {
+  //         store_id: transaction.store_id,
+  //         transaction_code: transaction.code,
+  //       });
+  //       return {
+  //         success: false,
+  //         message: `Transaction ${order_id} has been soft deleted, and products restored.`,
+  //       };
+  //     }
+
+  //     return {
+  //       success: false,
+  //       message: 'Transaction is not in a recognizable status',
+  //     };
+  //   } catch (error) {
+  //     console.error('Error processing transaction:', error.message);
+  //     return {
+  //       success: false,
+  //       message: error.message || 'Failed to process transaction',
+  //     };
+  //   }
+  // }
+
+  async processTripayNotification(body: any): Promise<any> {
     try {
-      const { transaction_status, order_id } = query;
+      const { merchant_ref, reference, status, is_closed_payment } = body;
+
+      console.log('Processing Tripay notification:', merchant_ref, status);
 
       const transaction = await this.prisma.transaction.findUnique({
-        where: { id: order_id },
+        where: { id: merchant_ref },
         include: {
           store: true,
           transaction_products: {
-            include: { product_code: true }, // Include product codes to update status
+            include: { product_code: true },
           },
           transaction_operations: true,
         },
       });
 
       if (!transaction) {
-        console.error('Transaction not found:', order_id);
+        console.error('Transaction not found:', merchant_ref);
         return { success: false, message: 'Transaction not found' };
       }
 
-      // ✅ SUCCESSFUL TRANSACTION HANDLING
-      if (transaction_status === 'settlement' && transaction.status !== 1) {
-        await this.prisma.transaction.update({
-          where: { id: order_id },
-          data: { status: 1, paid_amount: transaction.total_price },
-        });
-
-        await this.prisma.store.update({
-          where: { id: transaction.store_id },
-          data: { balance: { increment: transaction.total_price } },
-        });
-
-        await this.prisma.balanceLog.create({
-          data: {
-            store_id: transaction.store_id,
-            amount: transaction.total_price,
-            type: 'INCOME',
-            information: `Pemasukan dari transaksi #${transaction.code}`,
-          },
-        });
-
-        this.marketplaceClient.emit('transaction_settlement', {
-          id: transaction.id,
-        });
-        this.authClient.emit(
-          { cmd: 'transaction_settlement' },
-          {
-            store_id: transaction.store_id,
-            transaction_code: transaction.code,
-          },
-        );
-
-        return {
-          success: true,
-          redirectUrl: `marketplace-logamas://payment_success?order_id=${order_id}`,
-        };
+      if (transaction.status == 1 || transaction.status == 2) {
+        console.error('Already settled!');
+        return { success: false, message: 'Transaction already settled' };
       }
 
-      // ❌ FAILED TRANSACTION HANDLING (Soft Delete & Reset Voucher & Emit to Inventory)
-      if (
-        transaction_status === 'deny' ||
-        transaction_status === 'expire' ||
-        transaction_status === 'cancel' ||
-        transaction_status === 'failure' ||
-        transaction_status === null
-      ) {
-        console.log(
-          `Soft deleting transaction ${order_id} due to status: ${transaction_status}`,
-        );
-
-        await this.prisma.$transaction(async (tx) => {
-          // 🔹 Soft delete the transaction
-          await tx.transaction.update({
-            where: { id: order_id },
-            data: { deleted_at: new Date() },
-          });
-
-          // 🔹 Soft delete related transaction products
-          if (transaction.transaction_products.length > 0) {
-            await tx.transactionProduct.updateMany({
-              where: { transaction_id: order_id },
-              data: { deleted_at: new Date() },
-            });
-          }
-
-          // 🔹 Soft delete related transaction operations
-          if (transaction.transaction_operations.length > 0) {
-            await tx.transactionOperation.updateMany({
-              where: { transaction_id: order_id },
-              data: { deleted_at: new Date() },
-            });
-          }
-
-          // 🔹 If a voucher was used, mark it as "not used"
-          if (transaction.voucher_own_id) {
-            await tx.voucherOwned.update({
-              where: { id: transaction.voucher_own_id },
-              data: { is_used: false },
-            });
-          }
-
-          // 🔹 Restore Product Code Status (Available) & Emit to Inventory
-          console.log(
-            `Restoring product_code status for transaction: ${order_id}`,
-          );
-
-          for (const item of transaction.transaction_products.filter(
-            (item) =>
-              item.product_code_id !== 'DISCOUNT' &&
-              item.product_code_id !== 'TAX',
-          )) {
-            await tx.productCode.update({
-              where: { id: item.product_code_id },
-              data: { status: 0 }, // Set status to Available
+      // Jika pembayaran sudah close (closed payment)
+      if (is_closed_payment === 1) {
+        switch (status.toUpperCase()) {
+          case 'PAID':
+            // 🟢 Sukses
+            await this.prisma.transaction.update({
+              where: { id: merchant_ref },
+              data: { status: 1, paid_amount: transaction.total_price },
             });
 
-            // 🔥 Emit product status update to inventory service
-            this.inventoryClient.emit(
-              { cmd: 'product_code_updated' },
-              {
-                id: item.product_code_id,
-                status: 0,
+            await this.prisma.store.update({
+              where: { id: transaction.store_id },
+              data: { balance: { increment: transaction.total_price } },
+            });
+
+            await this.prisma.balanceLog.create({
+              data: {
+                store_id: transaction.store_id,
+                amount: transaction.total_price,
+                type: 'INCOME',
+                information: `Pemasukan dari transaksi #${transaction.code}`,
               },
-            );
-          }
-        });
+            });
 
-        this.marketplaceClient.emit('transaction_failed', {
-          id: transaction.id,
-        });
+            RmqHelper.publishEvent('transaction.marketplace.settlement', {
+              id: transaction.id,
+            });
+            RmqHelper.publishEvent('transaction.auth.settlement', {
+              store_id: transaction.store_id,
+              transaction_code: transaction.code,
+            });
 
-        this.authClient.emit(
-          { cmd: 'transaction_failed' },
-          {
-            store_id: transaction.store_id,
-            transaction_code: transaction.code,
-          },
-        );
+            return {
+              success: true,
+              redirectUrl: `marketplace-logamas://payment_success?order_id=${merchant_ref}`,
+            };
+          case 'REFUND':
+          case 'EXPIRED':
+          case 'FAILED':
+            // 🔴 Gagal
+            await this.failTransaction(transaction, status.toUpperCase());
+            return {
+              success: false,
+              message: 'Transaction marked as failed or expired',
+            };
 
-        return {
-          success: false,
-          message: `Transaction ${order_id} has been soft deleted, and products restored.`,
-        };
+          default:
+            console.error('Unrecognized Tripay status:', status);
+            return { success: false, message: 'Unrecognized payment status' };
+        }
       }
 
-      return {
-        success: false,
-        message: 'Transaction is not in a recognizable status',
-      };
+      return { success: false, message: 'Payment not closed yet' };
     } catch (error) {
-      console.error('Error processing transaction:', error.message);
+      console.error('Error processing Tripay notification:', error.message);
       return {
         success: false,
-        message: error.message || 'Failed to process transaction',
+        message: error.message || 'Failed to process Tripay transaction',
       };
     }
   }
 
+  private async failTransaction(transaction: any, status: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.transaction.update({
+        where: { id: transaction.id },
+        data: { deleted_at: new Date(), status: status === 'EXPIRED' ? 3 : 4 },
+      });
+
+      await tx.transactionProduct.updateMany({
+        where: { transaction_id: transaction.id },
+        data: { deleted_at: new Date() },
+      });
+
+      if (transaction.transaction_operations.length > 0) {
+        await tx.transactionOperation.updateMany({
+          where: { transaction_id: transaction.id },
+          data: { deleted_at: new Date() },
+        });
+      }
+
+      if (transaction.voucher_own_id) {
+        await tx.voucherOwned.update({
+          where: { id: transaction.voucher_own_id },
+          data: { is_used: false },
+        });
+      }
+
+      for (const item of transaction.transaction_products.filter(
+        (i) => i.product_code_id !== 'DISCOUNT' && i.product_code_id !== 'TAX',
+      )) {
+        await tx.productCode.update({
+          where: { id: item.product_code_id },
+          data: { status: 0 },
+        });
+
+        RmqHelper.publishEvent('product.code.updated', {
+          data: { id: item.product_code_id, status: 0 },
+          user: null,
+        });
+      }
+    });
+
+    RmqHelper.publishEvent('transaction.marketplace.failed', {
+      id: transaction.id,
+    });
+    RmqHelper.publishEvent('transaction.auth.failed', {
+      store_id: transaction.store_id,
+      transaction_code: transaction.code,
+    });
+  }
+
   async processMarketplaceTransaction(data: any, context: RmqContext) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
     try {
       console.log('Processing transaction:', data);
-
-      if (
-        !data.orderId ||
-        !data.grossAmount ||
-        !data.items ||
-        !data.customerDetails ||
-        !data.taxAmount
-      ) {
-        throw new Error('Missing required transaction details');
-      }
 
       const totalItemPrice = data.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -1233,7 +1361,10 @@ export class TransactionService extends BaseService {
           '0',
         )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      const paymentLink = await this.requestPaymentLink(data);
+      const respponsePaymentLink = await this.requestTripayPaymentLink(data);
+
+      const paymentLink = respponsePaymentLink.paymentLink;
+      const no_ref = respponsePaymentLink.no_ref;
 
       const filteredItems = data.items.filter(
         (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
@@ -1257,6 +1388,8 @@ export class TransactionService extends BaseService {
         .toString()
         .padStart(3, '0')}`;
 
+      //
+
       // 🔥 **Gunakan PrismaService yang sudah diinject**
       const result = await this.prisma.$transaction(async (tx) => {
         // **1. Insert Transaksi**
@@ -1268,6 +1401,7 @@ export class TransactionService extends BaseService {
             transaction_type: 1,
             payment_method: 5,
             status: 0,
+            no_ref: no_ref,
             sub_total_price: subTotalPrice,
             total_price: data.grossAmount,
             tax_price: data.taxAmount,
@@ -1368,31 +1502,28 @@ export class TransactionService extends BaseService {
 
         return transaction;
       });
+      await this.generatePdf(result.id);
 
       // 🔍 **Ambil Data Transaksi Lengkap Setelah Commit**
       const fullTransaction = await this.getFullTransactionDetails(result.id);
 
-      this.generatePdf(fullTransaction.id);
-      // 📡 Emit event ke Marketplace
-      this.marketplaceClient.emit('transaction_created', {
+      RmqHelper.publishEvent('transaction.marketplace.created', {
         orderId: fullTransaction.id,
         paymentLink: fullTransaction.payment_link,
         status: 'waiting_payment',
         transaction: fullTransaction,
       });
 
-      this.authClient.emit(
-        { cmd: 'transaction_created' },
-        {
-          store_id: fullTransaction.store_id,
-          transaction_code: fullTransaction.code,
-        },
-      );
-
+      RmqHelper.publishEvent('transaction.auth.created', {
+        store_id: fullTransaction.store_id,
+        transaction_code: fullTransaction.code,
+      });
+      channel.ack(originalMsg);
       return {
         success: true,
         message: 'Transaction processed successfully',
         data: {
+          no_ref: no_ref,
           paymentLink,
           expiredAt,
           discountAmount: totalItemPrice - data.grossAmount,
@@ -1400,11 +1531,80 @@ export class TransactionService extends BaseService {
         },
       };
     } catch (error) {
+      channel.nack(originalMsg);
       console.error('❌ Error processing transaction:', error.message);
       return {
         success: false,
         message: error.message || 'Failed to process transaction',
       };
+    }
+  }
+
+  async requestTripayPaymentLink(data: any): Promise<any> {
+    const apiKey = 'DEV-V0nm0v3uNsKpz9JNQH42QR59dzmnrRzuYHY5y3vG';
+    const privateKey = 'NV5zw-d5a2P-7WeT0-6D1ij-jSPxj';
+    const merchantCode = 'T39590';
+    const merchantRef = data.orderId;
+    const amount = data.grossAmount;
+    const expiryTime = Math.floor(Date.now() / 1000) + 1 * 60 * 60;
+
+    const signature = crypto
+      .createHmac('sha256', privateKey)
+      .update(merchantCode + merchantRef + amount)
+      .digest('hex');
+
+    console.log('disini!');
+
+    const payload = {
+      method: data.paymentMethod,
+      merchant_ref: merchantRef,
+      amount: amount,
+      customer_name:
+        data.customerDetails.first_name +
+        ' ' +
+        (data.customerDetails.last_name || ''),
+      customer_email: data.customerDetails.email,
+      customer_phone: data.customerDetails.phone,
+      order_items: data.items.map((item: any) => ({
+        sku: item.id || 'SKU_UNKNOWN',
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        product_url: item.product_url || '',
+        image_url: item.image_url || '',
+      })),
+      expired_time: expiryTime,
+      signature: signature,
+    };
+
+    const formData = qs.stringify(payload);
+
+    try {
+      const response = await axios.post(
+        'https://tripay.co.id/api-sandbox/transaction/create',
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          validateStatus: (status) => status < 999,
+        },
+      );
+
+      if (response.data.success) {
+        return {
+          paymentLink: response.data.data.checkout_url,
+          no_ref: response.data.data.reference,
+        };
+      } else {
+        throw new Error(
+          response.data.message || 'Failed to create Tripay transaction',
+        );
+      }
+    } catch (error: any) {
+      console.error('Tripay API Error:', error.message);
+      throw new Error('Failed to request payment link to Tripay');
     }
   }
 
@@ -1440,7 +1640,14 @@ export class TransactionService extends BaseService {
               country_code: 'IDN',
             },
           },
-          enabled_payments: ['credit_card', 'bca_va', 'gopay', 'shopeepay'],
+          enabled_payments: [
+            'bca_va',
+            'bri_va',
+            'bni_va',
+            'permata_va',
+            'cimb_va',
+            'other_qris',
+          ],
           credit_card: {
             secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
           },
@@ -1560,5 +1767,230 @@ export class TransactionService extends BaseService {
       },
     });
     return fullTransaction;
+  }
+
+  async createMarketplaceReplica(transactionData: any) {
+    try {
+      console.log(
+        'Start replicate Marketplace Transaction:',
+        transactionData.id,
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        // ✅ Insert Transaction
+        await tx.transaction.create({
+          data: {
+            id: transactionData.id,
+            date: new Date(transactionData.date),
+            code: transactionData.code,
+            transaction_type: transactionData.transaction_type,
+            payment_method: transactionData.payment_method,
+            status: transactionData.status,
+            no_ref: transactionData.no_ref,
+            sub_total_price: transactionData.sub_total_price,
+            nota_link: transactionData.nota_link,
+            total_price: transactionData.total_price,
+            tax_price: transactionData.tax_price,
+            payment_link: transactionData.payment_link,
+            poin_earned: transactionData.poin_earned,
+            tax_percent: transactionData.tax_percent,
+            expired_at: new Date(transactionData.expired_at),
+            store_id: transactionData.store_id,
+            customer_id: transactionData.customer_id,
+            voucher_own_id: transactionData.voucher_own_id || undefined,
+          },
+        });
+
+        // ✅ Insert Transaction Products
+        if (transactionData.transaction_products?.length > 0) {
+          const transactionProducts = transactionData.transaction_products.map(
+            (item) => ({
+              id: item.id,
+              transaction_id: transactionData.id,
+              product_code_id: item.product_code_id,
+              name: item.name,
+              type: item.type,
+              price: item.price,
+              total_price: item.total_price,
+              transaction_type: item.transaction_type,
+              weight: item.weight,
+              adjustment_price: item.adjustment_price,
+              status: item.status,
+            }),
+          );
+
+          await tx.transactionProduct.createMany({
+            data: transactionProducts,
+          });
+        }
+
+        // ✅ Update Product Codes to status = 1
+        if (transactionData.transaction_products?.length > 0) {
+          for (const item of transactionData.transaction_products) {
+            if (
+              item.product_code_id !== 'DISCOUNT' &&
+              item.product_code_id !== 'TAX'
+            ) {
+              await tx.productCode.update({
+                where: { id: item.product_code_id },
+                data: { status: 1 },
+              });
+            }
+          }
+        }
+
+        // ✅ Update Voucher if Used
+        if (transactionData.voucher_own_id) {
+          await tx.voucherOwned.update({
+            where: { id: transactionData.voucher_own_id },
+            data: { is_used: true },
+          });
+        }
+      });
+
+      console.log(
+        `✅ Marketplace Transaction ${transactionData.id} successfully replicated.`,
+      );
+    } catch (error) {
+      console.error(
+        '❌ Error replicating marketplace transaction:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  async marketplaceTransactionSettlementReplica(orderId: string) {
+    try {
+      console.log(
+        'Replicating Settlement for Marketplace Transaction:',
+        orderId,
+      );
+
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: orderId },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found for settlement:', orderId);
+        return;
+      }
+
+      if (transaction.status == 1) {
+        console.error('Already settled!');
+        return;
+      }
+
+      // ✅ Update transaction to settled
+      await this.prisma.transaction.update({
+        where: { id: orderId },
+        data: {
+          status: 1, // Mark as paid/settled
+          paid_amount: transaction.total_price,
+        },
+      });
+
+      // ✅ Update store balance
+      await this.prisma.store.update({
+        where: { id: transaction.store_id },
+        data: {
+          balance: { increment: transaction.total_price },
+        },
+      });
+
+      // ✅ Create balance log
+      await this.prisma.balanceLog.create({
+        data: {
+          store_id: transaction.store_id,
+          amount: transaction.total_price,
+          type: 'INCOME',
+          information: `Pemasukan dari transaksi #${transaction.code}`,
+        },
+      });
+
+      console.log(`✅ Settlement replicated for transaction ${orderId}`);
+    } catch (error) {
+      console.error(
+        '❌ Error replicating marketplace settlement:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  async marketplaceTransactionFailedReplica(orderId: string) {
+    try {
+      console.log('Replicating Failure for Marketplace Transaction:', orderId);
+
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: orderId },
+        include: {
+          transaction_products: true,
+          transaction_operations: true,
+        },
+      });
+
+      if (!transaction) {
+        console.error('Transaction not found for failure handling:', orderId);
+        return;
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        // 🔹 Soft delete the transaction
+        await tx.transaction.update({
+          where: { id: orderId },
+          data: { deleted_at: new Date() },
+        });
+
+        // 🔹 Soft delete related transaction products
+        if (transaction.transaction_products.length > 0) {
+          await tx.transactionProduct.updateMany({
+            where: { transaction_id: orderId },
+            data: { deleted_at: new Date() },
+          });
+        }
+
+        // 🔹 Soft delete related transaction operations
+        if (transaction.transaction_operations.length > 0) {
+          await tx.transactionOperation.updateMany({
+            where: { transaction_id: orderId },
+            data: { deleted_at: new Date() },
+          });
+        }
+
+        // 🔹 If voucher was used, reset it
+        if (transaction.voucher_own_id) {
+          await tx.voucherOwned.update({
+            where: { id: transaction.voucher_own_id },
+            data: { is_used: false },
+          });
+        }
+
+        // 🔹 Restore product codes
+        for (const item of transaction.transaction_products.filter(
+          (item) =>
+            item.product_code_id !== 'DISCOUNT' &&
+            item.product_code_id !== 'TAX',
+        )) {
+          await tx.productCode.update({
+            where: { id: item.product_code_id },
+            data: { status: 0 },
+          });
+
+          RmqHelper.publishEvent('product.code.updated', {
+            data: {
+              id: item.product_code_id,
+              status: 0,
+            },
+            user: null,
+          });
+        }
+      });
+
+      console.log(`✅ Failure replicated for transaction ${orderId}`);
+    } catch (error) {
+      console.error('❌ Error replicating marketplace failure:', error.message);
+      throw error;
+    }
   }
 }
