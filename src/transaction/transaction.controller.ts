@@ -513,7 +513,10 @@ export class TransactionController {
         status: newstatus,
         user: data.params.user.id,
       });
-      this.financeClient.emit({ cmd: 'transaction_approved' }, res);
+      RmqHelper.publishEvent('transaction.finance.approved', {
+        user: data.params.user.id,
+        data: res
+      });
     }
     return res;
   }
@@ -558,7 +561,11 @@ export class TransactionController {
         status: newstatus,
         user: data.params.user.id,
       });
-      // this.financeClient.emit({ cmd: 'transaction_disapproved' }, res);
+      
+      RmqHelper.publishEvent('transaction.finance.disapproved', {
+        user: data.params.user.id,
+        data: res
+      });
     }
     return res;
   }
