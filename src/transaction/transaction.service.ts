@@ -313,7 +313,8 @@ export class TransactionService extends BaseService {
       //   },
       // );
     } else if (data.detail_type == 'operation') {
-      data.total_price = data.unit * data.price + data.adjustment_price;
+      data.total_price =
+        Number(data.unit) * Number(data.price) + Number(data.adjustment_price);
       const transactionDetail = new CreateTransactionOperationRequest(data);
       validatedData = this.validation.validate(
         transactionDetail,
@@ -645,7 +646,7 @@ export class TransactionService extends BaseService {
     let tax = null;
     for (const operation of operations.data) {
       subtotal +=
-        operation.unit * operation.price +
+        Number(operation.unit) * operation.price +
         parseFloat(operation.adjustment_price);
       subtotalSales += subtotal;
       if (tax == null) {
