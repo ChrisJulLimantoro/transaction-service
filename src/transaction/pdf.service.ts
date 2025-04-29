@@ -23,6 +23,25 @@ export class PdfService {
     return new Intl.DateTimeFormat('id-ID').format(new Date(value));
   }
 
+  formatPhone(phone: string): string {
+    return phone.replace(/(\d{2})(\d{3})(\d{4})(\d{4})/, '0$2-$3-$4');
+  }
+
+  formatPaymentMethod(method: number): string {
+    switch (method) {
+      case 1:
+        return 'CASH';
+      case 2:
+        return 'BANK TRANSFER';
+      case 3:
+        return 'CREDIT CARD';
+      case 4:
+        return 'DEBIT CARD';
+      default:
+        return 'MARKETPLACE';
+    }
+  }
+
   async generateSalesNota(transaction: any): Promise<string> {
     const dataQrTrans = `${transaction.code};${transaction.id}`;
     const qrTrans = await this.generateQRCode(dataQrTrans);
@@ -237,12 +256,12 @@ export class PdfService {
             <div><strong>Total: ${this.formatCurrency(transaction.total_price)}</strong></div>
         </div>
 
-        <p><strong>Payment Method:</strong> ${transaction.payment_method == 1 ? 'CASH' : 'DEBIT'}</p>
+        <p><strong>Payment Method:</strong> ${this.formatPaymentMethod(transaction.payment_method)}</p>
         <div class="footer">
             <div class="info">
                 <strong>${transaction.store.code} | ${transaction.store.name}</strong><br />
-                ${transaction.store?.address ?? '-'}<br />
-                ${transaction.store?.wa_number ?? '081xxxxxxxxxx'}<br />
+                ${transaction.store?.address ?? 'Unlisted'}<br />
+                ${transaction.store?.wa_number == null ? '081xxxxxxxxxx' : this.formatPhone(transaction.store?.wa_number)}<br />
             <br />
             </div>
         </div>

@@ -5,6 +5,8 @@ export class CreateStoreRequest {
   name: string;
   company_id: string;
   logo: string | null;
+  address: string | null;
+  wa_number: string | null;
   is_active: boolean | null;
   is_flex_price: boolean | null;
   is_float_price: boolean | null;
@@ -21,6 +23,8 @@ export class CreateStoreRequest {
     code,
     name,
     company_id,
+    address,
+    wa_number,
     logo,
     is_active,
     is_flex_price,
@@ -36,6 +40,8 @@ export class CreateStoreRequest {
     this.id = id;
     this.code = code;
     this.name = name;
+    this.address = address;
+    this.wa_number = wa_number;
     this.is_active = is_active;
     this.is_flex_price = is_flex_price;
     this.is_float_price = is_float_price;
@@ -57,6 +63,8 @@ export class CreateStoreRequest {
       name: z.string().min(5),
       company_id: z.string().uuid(),
       logo: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      wa_number: z.string().nullable().optional(),
       is_active: z.boolean().nullable().optional(),
       is_flex_price: z.boolean().nullable().optional(),
       is_float_price: z.boolean().nullable().optional(),

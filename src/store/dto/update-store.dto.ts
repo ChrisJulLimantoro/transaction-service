@@ -3,6 +3,8 @@ export class UpdateStoreRequest {
   code: string | null;
   name: string | null;
   logo: string | null;
+  address: string | null;
+  wa_number: string | null;
   is_active: boolean | null;
   is_flex_price: boolean | null;
   is_float_price: boolean | null;
@@ -18,6 +20,8 @@ export class UpdateStoreRequest {
     code,
     name,
     logo,
+    address,
+    wa_number,
     is_active,
     is_flex_price,
     is_float_price,
@@ -32,6 +36,8 @@ export class UpdateStoreRequest {
     this.code = code;
     this.name = name;
     this.logo = logo;
+    this.address = address;
+    this.wa_number = wa_number;
     this.is_active = is_active;
     this.is_flex_price = is_flex_price;
     this.is_float_price = is_float_price;
@@ -49,6 +55,8 @@ export class UpdateStoreRequest {
       code: z.string().max(5).optional(),
       name: z.string().min(5).optional(),
       logo: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      wa_number: z.string().nullable().optional(),
       is_active: z.boolean().nullable().optional(),
       is_flex_price: z.boolean().nullable().optional(),
       is_float_price: z.boolean().nullable().optional(),

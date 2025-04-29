@@ -147,6 +147,8 @@ model Store {
   percent_kbl_adjustment Decimal @default(0) @db.Decimal
   fixed_kbl_adjustment  Decimal @default(0) @db.Decimal
   logo           String?
+  address       String?
+  wa_number     String?
 
   company      Company       @relation(fields: [company_id], references: [id])
   products     Product[]
