@@ -210,6 +210,7 @@ export class PdfService {
                     <i>${item.name.split(' - ')[0]}</i>
                     </div></td>
                     <td>${item.name.split(' - ')[1]}</td>
+                    <td>${item.type}</td>
                     <td>${item.unit} mm</td>
                     <td><div class="right">${this.formatCurrency(item.total_price)}</div></td>
                 </tr>`,
