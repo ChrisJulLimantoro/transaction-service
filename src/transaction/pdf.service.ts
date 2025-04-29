@@ -42,6 +42,17 @@ export class PdfService {
     }
   }
 
+  getTransType(type: number): string {
+    switch (type) {
+      case 1:
+        return 'SALES';
+      case 2:
+        return 'PURCHASE';
+      case 3:
+        return 'TRADE';
+    }
+  }
+
   async generateSalesNota(transaction: any): Promise<string> {
     const dataQrTrans = `${transaction.code};${transaction.id}`;
     const qrTrans = await this.generateQRCode(dataQrTrans);
@@ -162,7 +173,7 @@ export class PdfService {
         <div class="header">
             <div>
                 <div class="title">#${transaction.code}</div>
-                <div class="title">${transaction.transaction_type == 1 ? 'Sales' : 'Purchase'}</div>
+                <div class="title">${this.getTransType(transaction.transaction_type)}</div>
                 <!-- Order Details -->
                 <div class="order-details">
                     <div><strong>Order Date:</strong> ${this.formatDate(transaction.date)}</div>
