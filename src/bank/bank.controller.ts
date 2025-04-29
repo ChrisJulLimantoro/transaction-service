@@ -9,6 +9,7 @@ import {
 import { Describe } from 'src/decorator/describe.decorator';
 import { BankService } from './bank.service';
 import { RmqHelper } from 'src/helper/rmq.helper';
+import { Exempt } from 'src/decorator/exempt.decorator';
 
 @Controller('bank_account')
 export class BankController {
@@ -93,6 +94,7 @@ export class BankController {
   }
 
   @EventPattern('bank_account.created')
+  @Exempt()
   async createBankAccountReplica(
     @Payload() data: any,
     @Ctx() context: RmqContext,
@@ -139,6 +141,7 @@ export class BankController {
   }
 
   @EventPattern('bank_account.updated')
+  @Exempt()
   async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Bank Account Update Event', data);
     await RmqHelper.handleMessageProcessing(
@@ -181,6 +184,7 @@ export class BankController {
   }
 
   @EventPattern('bank_account.deleted')
+  @Exempt()
   async deleteBankAccountReplica(
     @Payload() data: any,
     @Ctx() context: RmqContext,

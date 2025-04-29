@@ -3,6 +3,7 @@ import { Ctx, EventPattern, MessagePattern, Payload, RmqContext } from '@nestjs/
 import { Describe } from 'src/decorator/describe.decorator';
 import { PayoutService } from './payout.service';
 import { RmqHelper } from 'src/helper/rmq.helper';
+import { Exempt } from 'src/decorator/exempt.decorator';
 
 @Controller('payout')
 export class PayoutController {
@@ -136,6 +137,7 @@ export class PayoutController {
   }
 
   @EventPattern('payout.created')
+  @Exempt()
   async createReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Payout Created Event', data);
     await RmqHelper.handleMessageProcessing(
@@ -152,6 +154,7 @@ export class PayoutController {
   }
 
   @EventPattern('payout.updated')
+  @Exempt()
   async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Payout Updated Event', data);
     await RmqHelper.handleMessageProcessing(
