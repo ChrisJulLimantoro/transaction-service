@@ -130,9 +130,30 @@ export class TransactionService extends BaseService {
         where: { id: data.store_id },
       });
 
-      const code = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/${(count + 1).toString().padStart(3, '0')}`;
+      const baseCode = `${this.transanctionType[data.transaction_type].label}/${store.code}/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+
+      let attempt = count;
+      let code = '';
+
+      while (true) {
+        const paddedNumber = attempt.toString().padStart(3, '0');
+        code = `${baseCode}/${paddedNumber}`;
+
+        const existing = await this.prisma.transaction.findFirst({
+          where: { code },
+        });
+
+        if (!existing) {
+          break;
+        }
+
+        attempt++;
+      }
+
       data.code = code;
-      data.paid_amount = data.total_price; // for now assume always fully paid
+      data.paid_amount = data.total_price;
+
+      console.log('Data transaksi ' + data.code);
 
       const transData = new CreateTransactionRequest(data);
       const validatedData = this.validation.validate(
