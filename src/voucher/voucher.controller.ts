@@ -94,6 +94,7 @@ export class VoucherController {
     }
   }
   @EventPattern('voucher.created')
+  @Exempt()
   async createReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Voucher Create Event', data);
     await RmqHelper.handleMessageProcessing(
@@ -139,6 +140,7 @@ export class VoucherController {
   }
 
   @EventPattern('voucher.updated')
+  @Exempt()
   async updateReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Voucher Update Event', data);
     await RmqHelper.handleMessageProcessing(
@@ -185,6 +187,7 @@ export class VoucherController {
   }
 
   @EventPattern('voucher.deleted')
+  @Exempt()
   async deleteReplica(@Payload() data: any, @Ctx() context: RmqContext) {
     console.log('Captured Voucher Deleted Event', data);
     await RmqHelper.handleMessageProcessing(
