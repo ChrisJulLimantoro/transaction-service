@@ -243,9 +243,10 @@ export class TransactionService extends BaseService {
         );
       }
     }
+    await super.update(id, data, user_id);
     // Generate PDF
-    this.generatePdf(id, user_id);
-    return super.update(id, data, user_id);
+    const response = await this.generatePdf(id, user_id);
+    return response;
   }
 
   async createDetail(data: any, user_id?: string): Promise<CustomResponse> {
@@ -943,7 +944,7 @@ export class TransactionService extends BaseService {
     );
 
     return CustomResponse.success(
-      'PDF generated successfully',
+      'Success Update Transaction!',
       updatedTransaction,
     );
   }
