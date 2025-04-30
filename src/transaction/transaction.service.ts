@@ -136,6 +136,9 @@ export class TransactionService extends BaseService {
       let code = '';
 
       while (true) {
+        if (attempt === 0) {
+          attempt++;
+        }
         const paddedNumber = attempt.toString().padStart(3, '0');
         code = `${baseCode}/${paddedNumber}`;
 
