@@ -88,8 +88,9 @@ export class TransactionService extends BaseService {
 
       try {
         await this.processTripayNotification({
-          transaction_status: 'expire',
-          order_id: trx.id,
+          transaction_status: 'expired',
+          merchant_ref: trx.id,
+          is_closed_payment: 1,
         });
       } catch (error) {
         console.error(
