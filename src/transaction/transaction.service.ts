@@ -439,6 +439,7 @@ export class TransactionService extends BaseService {
       try {
         const transactionDetail =
           await this.transactionOperationRepository.findOne(id);
+          console.log('transactiondetail id', id);
         if (!transactionDetail) {
           return CustomResponse.error(
             'Transaction Detail not found',
@@ -594,7 +595,7 @@ export class TransactionService extends BaseService {
     const operation = await this.transactionOperationRepository.findOne(id);
     console.log('delete detail id', id, product, operation);
 
-    if (!product || !operation) {
+    if (!product && !operation) {
       return CustomResponse.error('Transaction Detail not found', null, 404);
     }
 
