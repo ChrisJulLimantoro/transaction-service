@@ -249,7 +249,17 @@ export class TransactionService extends BaseService {
     data: any,
     user_id?: string,
   ): Promise<CustomResponse> {
+    console.log('status updated hihi haha', data.status);
     if (data.status) {
+      if (data.status == 2) {
+        data.approve = 1;
+        data.approve_by = user_id;
+        console.log('masuk sini update data', data);
+      } else {
+        data.approve = 0;
+        data.approve_by = null;
+        console.log('masuk sini else', data);
+      }
       // update status of the detail too
       const transaction = await this.repository.findOne(id);
       if (!transaction) {
@@ -572,8 +582,9 @@ export class TransactionService extends BaseService {
   async deleteDetail(id: string, user_id?: string): Promise<CustomResponse> {
     const product = await this.transactionProductRepository.findOne(id);
     const operation = await this.transactionOperationRepository.findOne(id);
+    console.log('delete detail id', id, product, operation);
 
-    if (!product && !operation) {
+    if (!product || !operation) {
       return CustomResponse.error('Transaction Detail not found', null, 404);
     }
 
@@ -916,7 +927,7 @@ export class TransactionService extends BaseService {
 
   async updateStatus(
     id: string,
-    status: number,
+    data: any,
     user_id?: string,
   ): Promise<CustomResponse> {
     const transaction = await this.repository.findOne(id);
@@ -925,7 +936,7 @@ export class TransactionService extends BaseService {
     }
     const res = await this.repository.update(
       id,
-      { approve: status },
+      data,
       null,
       user_id,
     );
@@ -1233,9 +1244,38 @@ export class TransactionService extends BaseService {
         include: {
           store: true,
           transaction_products: {
-            include: { product_code: true },
+            where: {
+              deleted_at: null,
+            },
+            include: {
+              product_code: {
+                include: {
+                  product: {
+                    include: {
+                      type: {
+                        include: {
+                          category: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              TransactionReview: true,
+            },
           },
-          transaction_operations: true,
+          transaction_operations: {
+            where: {
+              deleted_at: null,
+            },
+            include: {
+              operation: {
+                include: {
+                  account: true,
+                }
+              },
+            },
+          },
         },
       });
 
@@ -1279,6 +1319,12 @@ export class TransactionService extends BaseService {
             RmqHelper.publishEvent('transaction.auth.settlement', {
               store_id: transaction.store_id,
               transaction_code: transaction.code,
+            });
+            // Publish to finance service
+            var datatoFinance = transaction;
+            datatoFinance.status = 1;
+            RmqHelper.publishEvent('transaction.finance.updated', {
+              data: datatoFinance
             });
 
             return {

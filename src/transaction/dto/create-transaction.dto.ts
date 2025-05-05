@@ -18,6 +18,8 @@ export class CreateTransactionRequest {
   comment: string | null;
   account_id: string | null;
   transaction_details: [];
+  approve: number | null;
+  approve_by: string | null;
 
   constructor({
     date,
@@ -37,7 +39,9 @@ export class CreateTransactionRequest {
     total_price,
     comment,
     transaction_details,
-    account_id
+    account_id,
+    approve,
+    approve_by,
   }) {
     this.date = new Date(date);
     this.customer_id = customer_id;
@@ -58,6 +62,8 @@ export class CreateTransactionRequest {
     this.comment = comment;
     this.transaction_details = transaction_details;
     this.account_id = account_id;
+    this.approve = approve != null ? approve : 0;
+    this.approve_by = approve_by;
   }
 
   static schema() {
@@ -79,6 +85,8 @@ export class CreateTransactionRequest {
       total_price: z.number(),
       comment: z.string().nullable().optional(),
       account_id: z.string().uuid().nullable().optional(),
+      approve: z.number().nullable().optional(),
+      approve_by: z.string().nullable().optional(),
     });
   }
 }

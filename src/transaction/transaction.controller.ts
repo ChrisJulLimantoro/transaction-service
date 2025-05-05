@@ -179,6 +179,10 @@ export class TransactionController {
     ],
   })
   async createTransaction(@Payload() data: any) {
+    if (data.body.status == 2) {
+      data.body.approve = 1;
+      data.body.approve_by = data.params.user.id;
+    }
     const response = await this.transactionService.create(
       data.body,
       data.params.user.id,
@@ -186,6 +190,12 @@ export class TransactionController {
     if (response.success) {
       RmqHelper.publishEvent('transaction.created', {
         data: response.data,
+        user: data.params.user.id,
+      });
+
+      const transaction = await this.transactionService.findOne(response.data.id);
+      RmqHelper.publishEvent('transaction.finance.created', {
+        data: transaction,
         user: data.params.user.id,
       });
     }
@@ -234,6 +244,7 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
+      await this.publishTransactionUpdate(data.body.transaction_id);
     }
     return response;
   }
@@ -281,6 +292,7 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
+      await this.publishTransactionUpdate(id);
     }
     return response;
   }
@@ -336,6 +348,7 @@ export class TransactionController {
         data: response.data.syncResult,
         user: data.params.user.id,
       });
+      await this.publishTransactionUpdate(response.data.transaction_id);
     }
     return response;
   }
@@ -384,6 +397,11 @@ export class TransactionController {
         id: id,
         user: data.params.user.id,
       });
+
+      RmqHelper.publishEvent('transaction.finance.deleted', {
+        data: response,
+        user: data.params.user.id,
+      });
     }
     return response;
   }
@@ -424,12 +442,13 @@ export class TransactionController {
       id,
       data.params.user.id,
     );
-    if (response) {
+    if (response.success) {
       RmqHelper.publishEvent('transaction.detail.deleted', {
         id: id,
         data: response.data,
         user: data.params.user.id,
       });
+      await this.publishTransactionUpdate(response.data.transaction_id);
     }
     return response;
   }
@@ -458,6 +477,27 @@ export class TransactionController {
     )();
   }
 
+  private async publishTransactionUpdate(id: string) {
+    const transaction = await this.transactionService.findOne(id);
+    if (transaction) {
+      RmqHelper.publishEvent('transaction.finance.updated', {
+        data: transaction,
+      });
+    } else {
+      return CustomResponse.error(
+        'Transaction not found',
+        [
+          {
+            message: 'Transaction not found',
+            field: 'transaction_id',
+            code: 'not_found',
+          },
+        ],
+        404,
+      );
+    }
+  }
+  // Transaction status Done
   @MessagePattern({ cmd: 'put:transaction-approve/*' })
   @Describe({
     description: 'Transaction Approve',
@@ -488,7 +528,7 @@ export class TransactionController {
     }
     const res = await this.transactionService.updateStatus(
       params.id,
-      newstatus,
+      { approve: 1, status: 2, approve_by: data.params.user.id },
       data.params.user.id,
     );
     if (res.success) {
@@ -496,12 +536,11 @@ export class TransactionController {
         'res di trans acpprove sales',
         res.data.transaction_products[0],
       );
-      RmqHelper.publishEvent('transaction.status.updated', {
-        id: params.id,
-        status: newstatus,
+      RmqHelper.publishEvent('transaction.updated', {
+        data: res.data,
         user: data.params.user.id,
       });
-      RmqHelper.publishEvent('transaction.finance.approved', {
+      RmqHelper.publishEvent('transaction.finance.updated', {
         user: data.params.user.id,
         data: res
       });
@@ -509,6 +548,7 @@ export class TransactionController {
     return res;
   }
 
+  // Back to status paid
   @MessagePattern({ cmd: 'put:transaction-disapprove/*' })
   @Describe({
     description: 'Transaction Disapprove',
@@ -540,17 +580,16 @@ export class TransactionController {
 
     const res = await this.transactionService.updateStatus(
       params.id,
-      newstatus,
+      { approve: 0, status: 1, approve_by: null },
       data.params.user.id,
     );
     if (res.success) {
-      RmqHelper.publishEvent('transaction.status.updated', {
-        id: params.id,
-        status: newstatus,
+      RmqHelper.publishEvent('transaction.updated', {
+        data: res.data,
         user: data.params.user.id,
       });
       
-      RmqHelper.publishEvent('transaction.finance.disapproved', {
+      RmqHelper.publishEvent('transaction.finance.updated', {
         user: data.params.user.id,
         data: res
       });
@@ -558,30 +597,30 @@ export class TransactionController {
     return res;
   }
 
-  @EventPattern('transaction.status.updated')
-  @Exempt()
-  async transactionStatusUpdated(
-    @Payload() data: any,
-    @Ctx() context: RmqContext,
-  ) {
-    await RmqHelper.handleMessageProcessing(
-      context,
-      async () => {
-        console.log('Captured Transaction Status Update Event', data);
-        return await this.transactionService.updateStatus(
-          data.id,
-          data.status,
-          data.user,
-        );
-      },
-      {
-        queueName: 'transaction.status.updated',
-        useDLQ: true,
-        dlqRoutingKey: 'dlq.transaction.status.updated',
-        prisma: this.prisma,
-      },
-    )();
-  }
+  // @EventPattern('transaction.status.updated')
+  // @Exempt()
+  // async transactionStatusUpdated(
+  //   @Payload() data: any,
+  //   @Ctx() context: RmqContext,
+  // ) {
+  //   await RmqHelper.handleMessageProcessing(
+  //     context,
+  //     async () => {
+  //       console.log('Captured Transaction Status Update Event', data);
+  //       return await this.transactionService.updateStatus(
+  //         data.id,
+  //         data.status,
+  //         data.user,
+  //       );
+  //     },
+  //     {
+  //       queueName: 'transaction.status.updated',
+  //       useDLQ: true,
+  //       dlqRoutingKey: 'dlq.transaction.status.updated',
+  //       prisma: this.prisma,
+  //     },
+  //   )();
+  // }
 
   // Marketplace Endpoint
   @MessagePattern({ module: 'transaction', action: 'notificationTripay' })
