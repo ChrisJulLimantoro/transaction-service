@@ -1331,7 +1331,7 @@ export class TransactionService extends BaseService {
             var datatoFinance = transaction;
             datatoFinance.status = 1;
             RmqHelper.publishEvent('transaction.finance.updated', {
-              data: datatoFinance,
+              data: { data: datatoFinance },
             });
 
             return {
