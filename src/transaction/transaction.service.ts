@@ -435,9 +435,18 @@ export class TransactionService extends BaseService {
     if (data.detail_type == 'operation') {
       data.total_price =
         data.unit * Number(data.price) + Number(data.adjustment_price);
-      const transactionDetail =
-        await this.transactionOperationRepository.findOne(id);
-      if (!transactionDetail) {
+      try {
+        const transactionDetail =
+          await this.transactionOperationRepository.findOne(id);
+        if (!transactionDetail) {
+          return CustomResponse.error(
+            'Transaction Detail not found',
+            null,
+            404,
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching transaction detail:', error);
         return CustomResponse.error('Transaction Detail not found', null, 404);
       }
       const transactionDetailData = new CreateTransactionOperationRequest(data);
@@ -666,6 +675,7 @@ export class TransactionService extends BaseService {
   }
 
   async syncDetail(transaction_id: string, user_id?: string) {
+    console.log('sync detail', transaction_id);
     // Get Transaction
     const transaction = await this.repository.findOne(transaction_id);
     if (!transaction) {
@@ -721,6 +731,7 @@ export class TransactionService extends BaseService {
         parseFloat(transaction.adjustment_price),
       paid_amount: subtotal + subtotalSales * (tax / 100),
     };
+    console.log('Not_error', transaction_id);
     const res = await this.transactionRepository.update(
       transaction_id,
       updateData,
@@ -934,12 +945,7 @@ export class TransactionService extends BaseService {
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
-    const res = await this.repository.update(
-      id,
-      data,
-      null,
-      user_id,
-    );
+    const res = await this.repository.update(id, data, null, user_id);
     return CustomResponse.success(
       'Transaction status updated successfully',
       res,
@@ -1272,7 +1278,7 @@ export class TransactionService extends BaseService {
               operation: {
                 include: {
                   account: true,
-                }
+                },
               },
             },
           },
@@ -1324,7 +1330,7 @@ export class TransactionService extends BaseService {
             var datatoFinance = transaction;
             datatoFinance.status = 1;
             RmqHelper.publishEvent('transaction.finance.updated', {
-              data: datatoFinance
+              data: datatoFinance,
             });
 
             return {

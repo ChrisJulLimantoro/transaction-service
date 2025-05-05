@@ -193,7 +193,9 @@ export class TransactionController {
         user: data.params.user.id,
       });
 
-      const transaction = await this.transactionService.findOne(response.data.id);
+      const transaction = await this.transactionService.findOne(
+        response.data.id,
+      );
       RmqHelper.publishEvent('transaction.finance.created', {
         data: transaction,
         user: data.params.user.id,
@@ -332,6 +334,7 @@ export class TransactionController {
     ],
   })
   async updateTransactionDetail(@Payload() data: any) {
+    // console.log('data transaction detail', data);
     const id = data.params.id;
     const body = data.body;
     const response = await this.transactionService.updateDetail(
@@ -348,7 +351,7 @@ export class TransactionController {
         data: response.data.syncResult,
         user: data.params.user.id,
       });
-      await this.publishTransactionUpdate(response.data.transaction_id);
+      this.publishTransactionUpdate(response.data.updatedDetail.transaction_id);
     }
     return response;
   }
@@ -448,7 +451,7 @@ export class TransactionController {
         data: response.data,
         user: data.params.user.id,
       });
-      await this.publishTransactionUpdate(response.data.transaction_id);
+      this.publishTransactionUpdate(response.data.id);
     }
     return response;
   }
@@ -542,7 +545,7 @@ export class TransactionController {
       });
       RmqHelper.publishEvent('transaction.finance.updated', {
         user: data.params.user.id,
-        data: res
+        data: res,
       });
     }
     return res;
@@ -588,10 +591,10 @@ export class TransactionController {
         data: res.data,
         user: data.params.user.id,
       });
-      
+
       RmqHelper.publishEvent('transaction.finance.updated', {
         user: data.params.user.id,
-        data: res
+        data: res,
       });
     }
     return res;
