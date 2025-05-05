@@ -1466,17 +1466,35 @@ export class TransactionService extends BaseService {
         select: { code: true, tax_percentage: true },
       });
       const count = await this.prisma.transaction.count({
-        where: { store_id: String(data.storeId) },
+        where: {
+          transaction_type: data.transaction_type,
+          date: {
+            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+          },
+        },
       });
+      const baseCode = `SAL/${store.code}/${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+      let attempt = count;
+      let code = '';
 
-      const code = `SAL/${store?.code}/${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}/${(
-        count + 1
-      )
-        .toString()
-        .padStart(3, '0')}`;
+      while (true) {
+        if (attempt === 0) {
+          attempt++;
+        }
+        const paddedNumber = attempt.toString().padStart(3, '0');
+        code = `${baseCode}/${paddedNumber}`;
 
-      //
+        const existing = await this.prisma.transaction.findFirst({
+          where: { code },
+        });
 
+        if (!existing) {
+          break;
+        }
+
+        attempt++;
+      }
       // 🔥 **Gunakan PrismaService yang sudah diinject**
       const result = await this.prisma.$transaction(async (tx) => {
         // **1. Insert Transaksi**
