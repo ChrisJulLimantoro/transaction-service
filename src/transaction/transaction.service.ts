@@ -1444,7 +1444,10 @@ export class TransactionService extends BaseService {
           '0',
         )}:${now.getSeconds().toString().padStart(2, '0')} +0700`;
 
-      const respponsePaymentLink = await this.requestTripayPaymentLink(data);
+      const respponsePaymentLink = await this.requestTripayPaymentLink(
+        data,
+        context,
+      );
 
       const paymentLink = respponsePaymentLink.paymentLink;
       const no_ref = respponsePaymentLink.no_ref;
@@ -1623,7 +1626,9 @@ export class TransactionService extends BaseService {
     }
   }
 
-  async requestTripayPaymentLink(data: any): Promise<any> {
+  async requestTripayPaymentLink(data: any, context: RmqContext): Promise<any> {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
     const apiKey = 'DEV-V0nm0v3uNsKpz9JNQH42QR59dzmnrRzuYHY5y3vG';
     const privateKey = 'NV5zw-d5a2P-7WeT0-6D1ij-jSPxj';
     const merchantCode = 'T39590';
@@ -1674,7 +1679,6 @@ export class TransactionService extends BaseService {
           validateStatus: (status) => status < 999,
         },
       );
-
       if (response.data.success) {
         return {
           paymentLink: response.data.data.checkout_url,
@@ -1686,6 +1690,7 @@ export class TransactionService extends BaseService {
         );
       }
     } catch (error: any) {
+      channel.nack(originalMsg);
       console.error('Tripay API Error:', error.message);
       throw new Error('Failed to request payment link to Tripay');
     }
