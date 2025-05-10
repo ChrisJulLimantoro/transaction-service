@@ -27,7 +27,7 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
       const formattedErrors = this.formatPrismaError(exception);
       const errorResponse = {
         statusCode: 400,
-        message: 'Database error',
+        message: formattedErrors[0].message,
         errors: formattedErrors,
       };
 

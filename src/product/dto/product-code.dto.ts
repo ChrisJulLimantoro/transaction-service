@@ -27,7 +27,9 @@ export class ProductCodeDto {
     this.weight = parseFloat(weight);
     this.fixed_price = parseFloat(fixed_price);
     this.taken_out_at = taken_out_at ? new Date(taken_out_at) : null;
-    this.buy_price = isNaN(parseFloat(buy_price)) ? null : parseFloat(buy_price);
+    this.buy_price = isNaN(parseFloat(buy_price))
+      ? null
+      : parseFloat(buy_price);
   }
 
   static schema() {
