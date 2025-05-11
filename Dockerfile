@@ -1,26 +1,31 @@
-# Use official Node.js image
-FROM node:22
+# Stage 1 - Build Stage
+FROM node:23-alpine AS builder
+
+# Install build dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+# Copy source code and Prisma files
+COPY . .
+
+# Prisma Generate
+RUN npx prisma generate
+
+# Build the NestJS application
+RUN npm run build
+
+
+# Stage 2 - Production Stage
+FROM node:23-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY package*.json ./
-RUN npm install
+# Copy only the built app and necessary files
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
 
-# Copy source code
-COPY . .
-
-# Prisma Generate and Migrate
-RUN npx prisma generate
-
-# Build the NestJS
-RUN npm run build
-
-RUN ls -la /app/dist
-
-# Expose API port
-# EXPOSE 3004
-
-# Ensure Prisma Client is generated & migrations are applied before starting
-# CMD ["npm","run","start:prod"]
+# Install only production dependencies
+RUN npm install --production
