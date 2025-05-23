@@ -211,14 +211,14 @@ export class TransactionService extends BaseService {
     // Check if already exist
     const transactionCheck = await this.repository.findOne(data.id);
     if (transactionCheck) {
-      throw new Error('Transaction already exists');
+      throw new RpcException('Transaction already exists');
     }
     // Create transaction first
     const createData = { ...data };
     createData.delete('transaction_details');
     const transaction = await this.repository.create(createData, null, user_id);
     if (!transaction) {
-      throw new Error('Failed to create transaction');
+      throw new RpcException('Failed to create transaction');
     }
     // Create transaction details
     const transactionDetails = data['transaction_details'];
@@ -230,7 +230,7 @@ export class TransactionService extends BaseService {
           user_id,
         );
         if (!td) {
-          throw new Error('Failed to create transaction detail');
+          throw new RpcException('Failed to create transaction detail');
         }
       } else {
         const td = await this.transactionProductRepository.create(
@@ -239,7 +239,7 @@ export class TransactionService extends BaseService {
           user_id,
         );
         if (!td) {
-          throw new Error('Failed to create transaction detail');
+          throw new RpcException('Failed to create transaction detail');
         }
       }
     }
@@ -302,16 +302,16 @@ export class TransactionService extends BaseService {
         data.product_code_id,
       );
       if (!product) {
-        throw new Error('Product not found');
+        throw new RpcException('Product not found');
       }
       if (
         ![0, 2].includes(product.status) &&
         transaction.transaction_type == 1
       ) {
-        throw new Error('Product not available for sales');
+        throw new RpcException('Product not available for sales');
       }
       if (product.status != 1 && transaction.transaction_type == 2) {
-        throw new Error('Product not available for bought back');
+        throw new RpcException('Product not available for bought back');
       }
       const transactionDetail = new CreateTransactionProductRequest(data);
       console.log('transactionDetail', transactionDetail);
@@ -379,7 +379,7 @@ export class TransactionService extends BaseService {
     }
 
     if (!result) {
-      throw new Error('Failed to create transaction detail');
+      throw new RpcException('Failed to create transaction detail');
     }
     const transactionRes = await this.syncDetail(data.transaction_id);
     result.transaction = transactionRes;
@@ -396,7 +396,7 @@ export class TransactionService extends BaseService {
     if (data.type == 'Operation') {
       const tdc = await this.transactionOperationRepository.findOne(data.id);
       if (tdc) {
-        throw new Error('Transaction Detail already exists');
+        throw new RpcException('Transaction Detail already exists');
       }
       // Create transaction detail first
       const created = await this.transactionOperationRepository.create(
@@ -405,12 +405,12 @@ export class TransactionService extends BaseService {
         user_id,
       );
       if (!created) {
-        throw new Error('Failed to create transaction detail');
+        throw new RpcException('Failed to create transaction detail');
       }
     } else {
       const tpc = await this.transactionProductRepository.findOne(data.id);
       if (tpc) {
-        throw new Error('Transaction Detail already exists');
+        throw new RpcException('Transaction Detail already exists');
       }
       // Create transaction detail first
       const created = await this.transactionProductRepository.create(
@@ -419,7 +419,7 @@ export class TransactionService extends BaseService {
         user_id,
       );
       if (!created) {
-        throw new Error('Failed to create transaction detail');
+        throw new RpcException('Failed to create transaction detail');
       }
     }
   }
@@ -439,7 +439,7 @@ export class TransactionService extends BaseService {
       try {
         const transactionDetail =
           await this.transactionOperationRepository.findOne(id);
-          console.log('transactiondetail id', id);
+        console.log('transactiondetail id', id);
         if (!transactionDetail) {
           return CustomResponse.error(
             'Transaction Detail not found',
@@ -508,7 +508,7 @@ export class TransactionService extends BaseService {
     if (data.type == 'Operation') {
       const tdc = await this.transactionOperationRepository.findOne(data.id);
       if (!tdc) {
-        throw new Error('Transaction Detail not exist');
+        throw new RpcException('Transaction Detail not exist');
       }
       // Create transaction detail first
       const updated = await this.transactionOperationRepository.update(
@@ -518,12 +518,12 @@ export class TransactionService extends BaseService {
         user_id,
       );
       if (!updated) {
-        throw new Error('Failed to create transaction detail');
+        throw new RpcException('Failed to create transaction detail');
       }
     } else {
       const tpc = await this.transactionProductRepository.findOne(data.id);
       if (!tpc) {
-        throw new Error('Transaction Detail not exists');
+        throw new RpcException('Transaction Detail not exists');
       }
       // Create transaction detail first
       const updated = await this.transactionProductRepository.update(
@@ -533,7 +533,7 @@ export class TransactionService extends BaseService {
         user_id,
       );
       if (!updated) {
-        throw new Error('Failed to create transaction detail');
+        throw new RpcException('Failed to create transaction detail');
       }
     }
   }
@@ -778,7 +778,7 @@ export class TransactionService extends BaseService {
             detail.product_code.status == 2 &&
             transaction.transaction_type == 1
           ) {
-            throw new Error(
+            throw new RpcException(
               'Product Already bought back, failed to delete transaction!',
             );
           }
@@ -890,7 +890,7 @@ export class TransactionService extends BaseService {
             detail.product_code.status == 2 &&
             transaction.transaction_type == 1
           ) {
-            throw new Error(
+            throw new RpcException(
               'Product Already bought back, failed to delete transaction!',
             );
           }
@@ -995,7 +995,7 @@ export class TransactionService extends BaseService {
   async getPdfPath(transactionId: string): Promise<string> {
     const transaction = await this.repository.findOne(transactionId);
     if (!transaction) {
-      throw new Error('Transaction not found');
+      throw new RpcException('Transaction not found');
     }
     const filePath = path.join(this.storagePath, `${transaction.nota_link}`);
     return fs.existsSync(filePath) ? filePath : null;
@@ -1426,7 +1426,7 @@ export class TransactionService extends BaseService {
         0,
       );
       if (totalItemPrice !== data.grossAmount) {
-        throw new Error(
+        throw new RpcException(
           `Gross amount mismatch! Expected: ${totalItemPrice}, Got: ${data.grossAmount}`,
         );
       }
@@ -1546,7 +1546,9 @@ export class TransactionService extends BaseService {
               });
 
               if (!productCode) {
-                throw new Error(`Product code not found for ID: ${item.id}`);
+                throw new RpcException(
+                  `Product code not found for ID: ${item.id}`,
+                );
               }
 
               // **Format Name & Type**
@@ -1705,14 +1707,14 @@ export class TransactionService extends BaseService {
           no_ref: response.data.data.reference,
         };
       } else {
-        throw new Error(
+        throw new RpcException(
           response.data.message || 'Failed to create Tripay transaction',
         );
       }
     } catch (error: any) {
       channel.nack(originalMsg);
       console.error('Tripay API Error:', error.message);
-      throw new Error('Failed to request payment link to Tripay');
+      throw new RpcException('Failed to request payment link to Tripay');
     }
   }
 
@@ -1777,7 +1779,7 @@ export class TransactionService extends BaseService {
       return response.data.redirect_url;
     } catch (error) {
       console.error('Midtrans API Error:', error.message);
-      throw new Error('Failed to request payment link');
+      throw new RpcException('Failed to request payment link');
     }
   }
 

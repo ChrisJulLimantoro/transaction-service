@@ -235,7 +235,7 @@ export class BaseRepository<T> {
     const model = Prisma.dmmf.datamodel.models.find(
       (m) => m.name.toLowerCase() === this.modelName.toLowerCase(),
     );
-    if (!model) throw new Error(`Model ${this.modelName} not found`);
+    if (!model) throw new RpcException(`Model ${this.modelName} not found`);
 
     return model.fields.map((field) => ({
       name: field.name,

@@ -24,7 +24,7 @@ export class CustomerService {
     const user = await this.prismaService.customer.findUnique({
       where: { email: data.email },
     });
-    if (!user) throw new Error('User not found!');
+    if (!user) throw new RpcException('User not found!');
     await this.prismaService.customer.update({
       where: { email: data.email },
       data: { is_verified: true },
@@ -57,7 +57,7 @@ export class CustomerService {
     const user = await this.prismaService.customer.findUnique({
       where: { id: userId },
     });
-    if (!user) throw new Error('User not found!');
+    if (!user) throw new RpcException('User not found!');
 
     const updatedUser = await this.prismaService.customer.update({
       where: { id: userId },
@@ -76,7 +76,7 @@ export class CustomerService {
         deleted_at: null,
       },
     });
-    if (!users) throw new Error('No users found!');
+    if (!users) throw new RpcException('No users found!');
 
     return CustomResponse.success('Users retrieved!', users, 200);
   }
@@ -84,14 +84,14 @@ export class CustomerService {
     const user = await this.prismaService.customer.findUnique({
       where: { id: id, deleted_at: null },
     });
-    if (!user) throw new Error('User not found!');
+    if (!user) throw new RpcException('User not found!');
     return CustomResponse.success('User retrieved!', user, 200);
   }
   async findByEmail(email: string) {
     const user = await this.prismaService.customer.findUniqueOrThrow({
       where: { email: email, deleted_at: null },
     });
-    if (!user) throw new Error('User not found!');
+    if (!user) throw new RpcException('User not found!');
     return CustomResponse.success('User retrieved!', user, 200);
   }
 }
