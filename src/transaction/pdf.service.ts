@@ -253,15 +253,15 @@ export class PdfService {
         <!-- Total Section -->
         <div class="total-section">
             <div>SubTotal: <strong>${this.formatCurrency(transaction.sub_total_price)}</strong></div>`;
+    if (transaction.transaction_type == 3) {
+      htmlContent += `<div>Trade In Fee: <strong>${this.formatCurrency(transaction.adjustment_price)}</strong></div>`;
+    }
     if (transaction.transaction_type != 2) {
       htmlContent += `<div>Taxes: <strong>${this.formatCurrency(transaction.tax_price)}</strong></div>`;
     }
     if (transaction.payment_link != null) {
       htmlContent += `<div>Poin Earned: <strong>${transaction.poin_earned}</strong></div>
             <div>Voucher Discount: <strong>-${this.formatCurrency(voucherDiscount)}</strong></div>`;
-    }
-    if (transaction.transaction_type == 3) {
-      htmlContent += `<div>Trade In Fee: <strong>${this.formatCurrency(transaction.adjustment_price)}</strong></div>`;
     }
     htmlContent += `<hr />
             <div><strong>Total: ${this.formatCurrency(transaction.total_price)}</strong></div>
