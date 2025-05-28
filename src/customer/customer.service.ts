@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
 import { CustomResponse } from 'src/exception/dto/custom-response.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 
