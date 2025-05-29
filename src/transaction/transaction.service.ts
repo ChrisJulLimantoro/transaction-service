@@ -600,11 +600,11 @@ export class TransactionService extends BaseService {
     }
 
     if (product) {
-      if (product.product_code.status == 2 && product.transaction_type == 1) {
-        return CustomResponse.error('Product Already bought back', null, 400);
-      }
       await this.transactionProductRepository.delete(id, null, user_id);
       if (product.product_code_id != null) {
+        if (product.product_code.status == 2 && product.transaction_type == 1) {
+          return CustomResponse.error('Product Already bought back', null, 400);
+        }
         // Update product status Locally
         const code = await this.productCodeRepository.update(
           product.product_code_id,
@@ -724,14 +724,18 @@ export class TransactionService extends BaseService {
       }
     }
 
+    // calculate tax price
+    const currTax =
+      subtotalSales * (tax / 100) +
+      parseFloat(transaction.adjustment_price) * (tax / 100);
+
     const updateData = {
       sub_total_price: subtotal,
-      tax_price: subtotalSales * (tax / 100),
+      tax_price: currTax,
       total_price:
-        subtotal +
-        subtotalSales * (tax / 100) +
-        parseFloat(transaction.adjustment_price),
-      paid_amount: subtotal + subtotalSales * (tax / 100),
+        subtotal + currTax + parseFloat(transaction.adjustment_price),
+      paid_amount:
+        subtotal + currTax + parseFloat(transaction.adjustment_price),
     };
     console.log('Not_error', transaction_id);
     const res = await this.transactionRepository.update(
