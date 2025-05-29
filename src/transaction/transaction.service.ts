@@ -13,7 +13,7 @@ import { TransactionProductRepository } from 'src/repositories/transaction-produ
 import { TransactionOperationRepository } from 'src/repositories/transaction-operation.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductCodeRepository } from 'src/repositories/product-code.repository';
-import { ClientProxy, RmqContext } from '@nestjs/microservices';
+import { ClientProxy, RmqContext, RpcException } from '@nestjs/microservices';
 import { PdfService } from './pdf.service';
 import * as fs from 'fs-extra';
 import * as path from 'path';
