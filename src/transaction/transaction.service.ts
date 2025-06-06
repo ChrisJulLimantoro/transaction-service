@@ -250,16 +250,13 @@ export class TransactionService extends BaseService {
     data: any,
     user_id?: string,
   ): Promise<CustomResponse> {
-    console.log('status updated hihi haha', data.status);
     if (data.status) {
       if (data.status == 2) {
         data.approve = 1;
         data.approve_by = user_id;
-        console.log('masuk sini update data', data);
       } else {
         data.approve = 0;
         data.approve_by = null;
-        console.log('masuk sini else', data);
       }
       // update status of the detail too
       const transaction = await this.repository.findOne(id);

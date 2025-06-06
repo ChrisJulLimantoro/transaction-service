@@ -241,7 +241,7 @@ export class PdfService {
                     </div></td>
                     <td>${item.name.split(' - ')[1]}</td>
                     <td>${item.type}</td>
-                    <td>${item.unit} mm</td>
+                    <td>${item.unit} ${item.operation.uom}</td>
                     <td><div class="right">${this.formatCurrency(item.total_price)}</div></td>
                 </tr>`,
                   )

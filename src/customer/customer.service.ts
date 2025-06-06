@@ -8,6 +8,7 @@ export class CustomerService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async register(data: any): Promise<any> {
+    data.email = data.email.toLowerCase();
     const user = await this.prismaService.customer.create({
       data: {
         id: data.id,
@@ -89,7 +90,8 @@ export class CustomerService {
     return CustomResponse.success('User retrieved!', user, 200);
   }
   async findByEmail(email: string) {
-    const user = await this.prismaService.customer.findUniqueOrThrow({
+    email = email.toLowerCase();
+    const user = await this.prismaService.customer.findUnique({
       where: { email: email, deleted_at: null },
     });
     if (!user) throw new RpcException('User not found!');

@@ -53,6 +53,7 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
   // Helper method to format ZodError
   private formatZodError(error: ZodError): Record<string, any>[] {
     return error.issues.map((issue) => {
+      console.log('Zod issue:', issue);
       const formattedIssue: Record<string, any> = {
         field: issue.path.join('.'),
         message: issue.message,
