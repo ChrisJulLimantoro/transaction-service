@@ -149,7 +149,8 @@ export class TransactionController {
   })
   async getTransactionById(@Payload() data: any) {
     const id = data.params.id;
-    return await this.transactionService.findOne(id);
+    const res = await this.transactionService.findOne(id);
+    return res;
   }
 
   @MessagePattern({ cmd: 'get:transaction-nota/*' })
@@ -535,10 +536,7 @@ export class TransactionController {
       data.params.user.id,
     );
     if (res.success) {
-      console.log(
-        'res di trans acpprove sales',
-        res.data,
-      );
+      console.log('res di trans acpprove sales', res.data);
       RmqHelper.publishEvent('transaction.updated', {
         data: res.data,
         user: data.params.user.id,

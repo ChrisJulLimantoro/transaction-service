@@ -37,9 +37,6 @@ export class TransactionService extends BaseService {
     protected readonly validation: ValidationService,
     protected readonly pdfService: PdfService,
     private readonly prisma: PrismaService,
-    @Inject('INVENTORY') private readonly inventoryClient: ClientProxy,
-    @Inject('MARKETPLACE') private readonly marketplaceClient: ClientProxy,
-    @Inject('AUTH') private readonly authClient: ClientProxy,
   ) {
     super(validation);
   }
@@ -1719,149 +1716,149 @@ export class TransactionService extends BaseService {
     }
   }
 
-  private async requestPaymentLink(data: any): Promise<string> {
-    try {
-      const response = await axios.post(
-        'https://app.sandbox.midtrans.com/snap/v1/transactions',
-        {
-          transaction_details: {
-            order_id: data.orderId,
-            gross_amount: data.grossAmount,
-          },
-          item_details: data.items,
-          customer_details: {
-            first_name: data.customerDetails.first_name || '',
-            last_name: data.customerDetails.last_name || '',
-            email: data.customerDetails.email || '',
-            phone: data.customerDetails.phone || '',
-            billing_address: {
-              address:
-                data.customerDetails.billing_address?.address || 'Unknown',
-              city: data.customerDetails.billing_address?.city || 'Unknown',
-              postal_code:
-                data.customerDetails.billing_address?.postal_code || '00000',
-              country_code: 'IDN',
-            },
-            shipping_address: {
-              address:
-                data.customerDetails.shipping_address?.address || 'Unknown',
-              city: data.customerDetails.shipping_address?.city || 'Unknown',
-              postal_code:
-                data.customerDetails.shipping_address?.postal_code || '00000',
-              country_code: 'IDN',
-            },
-          },
-          enabled_payments: [
-            'bca_va',
-            'bri_va',
-            'bni_va',
-            'permata_va',
-            'cimb_va',
-            'other_qris',
-          ],
-          credit_card: {
-            secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
-          },
-          expiry: {
-            unit: 'minute',
-            duration: 60,
-          },
-          custom_field1: `Store: ${data.storeId}`,
-          custom_field2: `Customer: ${data.customerDetails.email}`,
-        },
-        {
-          headers: {
-            Authorization: `Basic U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
+  // private async requestPaymentLink(data: any): Promise<string> {
+  //   try {
+  //     const response = await axios.post(
+  //       'https://app.sandbox.midtrans.com/snap/v1/transactions',
+  //       {
+  //         transaction_details: {
+  //           order_id: data.orderId,
+  //           gross_amount: data.grossAmount,
+  //         },
+  //         item_details: data.items,
+  //         customer_details: {
+  //           first_name: data.customerDetails.first_name || '',
+  //           last_name: data.customerDetails.last_name || '',
+  //           email: data.customerDetails.email || '',
+  //           phone: data.customerDetails.phone || '',
+  //           billing_address: {
+  //             address:
+  //               data.customerDetails.billing_address?.address || 'Unknown',
+  //             city: data.customerDetails.billing_address?.city || 'Unknown',
+  //             postal_code:
+  //               data.customerDetails.billing_address?.postal_code || '00000',
+  //             country_code: 'IDN',
+  //           },
+  //           shipping_address: {
+  //             address:
+  //               data.customerDetails.shipping_address?.address || 'Unknown',
+  //             city: data.customerDetails.shipping_address?.city || 'Unknown',
+  //             postal_code:
+  //               data.customerDetails.shipping_address?.postal_code || '00000',
+  //             country_code: 'IDN',
+  //           },
+  //         },
+  //         enabled_payments: [
+  //           'bca_va',
+  //           'bri_va',
+  //           'bni_va',
+  //           'permata_va',
+  //           'cimb_va',
+  //           'other_qris',
+  //         ],
+  //         credit_card: {
+  //           secure: true, // 🔒 Aktifkan 3DS security untuk kartu kredit
+  //         },
+  //         expiry: {
+  //           unit: 'minute',
+  //           duration: 60,
+  //         },
+  //         custom_field1: `Store: ${data.storeId}`,
+  //         custom_field2: `Customer: ${data.customerDetails.email}`,
+  //       },
+  //       {
+  //         headers: {
+  //           Authorization: `Basic U0ItTWlkLXNlcnZlci1Rc1pJYjdkT01FUm1QMmdpWi1KZjhmMnE=`,
+  //           'Content-Type': 'application/json',
+  //         },
+  //       },
+  //     );
 
-      return response.data.redirect_url;
-    } catch (error) {
-      console.error('Midtrans API Error:', error.message);
-      throw new RpcException('Failed to request payment link');
-    }
-  }
+  //     return response.data.redirect_url;
+  //   } catch (error) {
+  //     console.error('Midtrans API Error:', error.message);
+  //     throw new RpcException('Failed to request payment link');
+  //   }
+  // }
 
-  private async createTransactionRecord(
-    data: any,
-    paymentLink: string,
-    subTotalPrice: number,
-    code: string,
-    expiredAt: Date,
-  ) {
-    return this.prisma.transaction.create({
-      data: {
-        id: String(data.orderId),
-        date: new Date(),
-        code,
-        transaction_type: 1,
-        payment_method: 5,
-        status: 0,
-        sub_total_price: subTotalPrice,
-        total_price: data.grossAmount,
-        tax_price: data.taxAmount,
-        payment_link: paymentLink,
-        expired_at: expiredAt,
-        store: { connect: { id: String(data.storeId) } },
-        customer: { connect: { id: String(data.customerId) } },
-        voucher_used: data.voucherOwnedId
-          ? { connect: { id: String(data.voucherOwnedId) } }
-          : undefined,
-      },
-    });
-  }
+  // private async createTransactionRecord(
+  //   data: any,
+  //   paymentLink: string,
+  //   subTotalPrice: number,
+  //   code: string,
+  //   expiredAt: Date,
+  // ) {
+  //   return this.prisma.transaction.create({
+  //     data: {
+  //       id: String(data.orderId),
+  //       date: new Date(),
+  //       code,
+  //       transaction_type: 1,
+  //       payment_method: 5,
+  //       status: 0,
+  //       sub_total_price: subTotalPrice,
+  //       total_price: data.grossAmount,
+  //       tax_price: data.taxAmount,
+  //       payment_link: paymentLink,
+  //       expired_at: expiredAt,
+  //       store: { connect: { id: String(data.storeId) } },
+  //       customer: { connect: { id: String(data.customerId) } },
+  //       voucher_used: data.voucherOwnedId
+  //         ? { connect: { id: String(data.voucherOwnedId) } }
+  //         : undefined,
+  //     },
+  //   });
+  // }
 
-  private async createTransactionProducts(transactionId: string, items: any[]) {
-    for (const item of items.filter(
-      (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
-    )) {
-      await this.prisma.transactionProduct.create({
-        data: {
-          transaction: { connect: { id: transactionId } },
-          product_code: { connect: { id: item.id } },
-          name: item.name,
-          price: Number(item.price), // Pastikan ini adalah angka
-          total_price: Number(item.price) * Number(item.quantity),
-          transaction_type: 1, // 1 = Sales, bisa disesuaikan
-          weight: Number(item.weight || 0), // Pastikan ada nilai default jika kosong
-          adjustment_price: Number(item.adjustment_price || 0), // Pastikan ada nilai default jika kosong
-          status: 1, // Status default 1 (misalnya: Sold Out)
-        },
-      });
-      // Update status ProductCode menjadi Sold Out
-      await this.prisma.productCode.update({
-        where: { id: item.id },
-        data: { status: 1 },
-      });
+  // private async createTransactionProducts(transactionId: string, items: any[]) {
+  //   for (const item of items.filter(
+  //     (item) => item.id !== 'DISCOUNT' && item.id !== 'TAX',
+  //   )) {
+  //     await this.prisma.transactionProduct.create({
+  //       data: {
+  //         transaction: { connect: { id: transactionId } },
+  //         product_code: { connect: { id: item.id } },
+  //         name: item.name,
+  //         price: Number(item.price), // Pastikan ini adalah angka
+  //         total_price: Number(item.price) * Number(item.quantity),
+  //         transaction_type: 1, // 1 = Sales, bisa disesuaikan
+  //         weight: Number(item.weight || 0), // Pastikan ada nilai default jika kosong
+  //         adjustment_price: Number(item.adjustment_price || 0), // Pastikan ada nilai default jika kosong
+  //         status: 1, // Status default 1 (misalnya: Sold Out)
+  //       },
+  //     });
+  //     // Update status ProductCode menjadi Sold Out
+  //     await this.prisma.productCode.update({
+  //       where: { id: item.id },
+  //       data: { status: 1 },
+  //     });
 
-      // Emit event ke inventory
-      RmqHelper.publishEvent('product.code.updated', {
-        data: {
-          id: item.id,
-          status: 1,
-        },
-        user: null,
-      });
-      // this.inventoryClient.emit(
-      //   { cmd: 'product_code_updated' },
-      //   {
-      //     id: item.id,
-      //     status: 1,
-      //   },
-      // );
-    }
-  }
+  //     // Emit event ke inventory
+  //     RmqHelper.publishEvent('product.code.updated', {
+  //       data: {
+  //         id: item.id,
+  //         status: 1,
+  //       },
+  //       user: null,
+  //     });
+  //     // this.inventoryClient.emit(
+  //     //   { cmd: 'product_code_updated' },
+  //     //   {
+  //     //     id: item.id,
+  //     //     status: 1,
+  //     //   },
+  //     // );
+  //   }
+  // }
 
-  private async updateVoucherIfUsed(voucherOwnedId: string) {
-    if (voucherOwnedId) {
-      await this.prisma.voucherOwned.update({
-        where: { id: voucherOwnedId },
-        data: { is_used: true },
-      });
-    }
-  }
+  // private async updateVoucherIfUsed(voucherOwnedId: string) {
+  //   if (voucherOwnedId) {
+  //     await this.prisma.voucherOwned.update({
+  //       where: { id: voucherOwnedId },
+  //       data: { is_used: true },
+  //     });
+  //   }
+  // }
 
   private async getFullTransactionDetails(transactionId: string) {
     const fullTransaction = await this.prisma.transaction.findUnique({
