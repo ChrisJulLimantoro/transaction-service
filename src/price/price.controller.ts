@@ -2,57 +2,58 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { PriceService } from './price.service';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('price')
 export class PriceController {
-  constructor(private readonly service: PriceService) {}
+  constructor(
+    private readonly service: PriceService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
-  @EventPattern({ cmd: 'price_created' })
+  @EventPattern('price.created')
   @Exempt()
   async priceCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
-      'Error processing price_created event',
-    );
+      () => this.service.create(data.data, data.user),
+      {
+        queueName: 'price.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price.created',
+        prisma: this.prisma,
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'price_updated' })
+  @EventPattern('price.updated')
   @Exempt()
   async priceUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
-      'Error processing price_updated event',
-    );
+      () => this.service.update(data.data.id, data.user),
+      {
+        queueName: 'price.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price.updated',
+        prisma: this.prisma,
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'price_deleted' })
+  @EventPattern('price.deleted')
   @Exempt()
   async priceDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
-      'Error processing price_deleted event',
-    );
+      () => this.service.delete(data.data, data.user),
+      {
+        queueName: 'price.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.price.deleted',
+        prisma: this.prisma,
+      },
+    )();
   }
 }

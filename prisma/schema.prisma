@@ -13,128 +13,478 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Category{
-  id          String @id @db.Uuid @default(uuid())
-  code        String
-  name        String
-  company_id  String @db.Uuid
+model Category {
+  id         String @id @default(uuid()) @db.Uuid
+  code       String
+  name       String
+  company_id String @db.Uuid
 
-  types Type[]
+  types   Type[]
   company Company @relation(fields: [company_id], references: [id])
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("categories")
   @@index([deleted_at])
+  @@map("categories")
 }
 
-model Type{
-  id          String @id @db.Uuid @default(uuid())
+model Type {
+  id          String @id @default(uuid()) @db.Uuid
   code        String
   name        String
   category_id String @db.Uuid
 
-  category Category @relation(fields: [category_id], references: [id])
-  products Product[]
-  prices Price[]
+  // PriceReduction
+  percent_price_reduction Decimal @db.Decimal @default(0)
+  fixed_price_reduction   Decimal @db.Decimal @default(0)
+  // BrokenReduction
+  percent_broken_reduction Decimal @db.Decimal @default(0)
+  fixed_broken_reduction   Decimal @db.Decimal @default(0)
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  category Category  @relation(fields: [category_id], references: [id])
+  products Product[]
+  prices   Price[]
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("types")
   @@index([deleted_at])
+  @@map("types")
 }
 
-model Product{
-  id          String @id @db.Uuid @default(uuid())
-  code        String
-  name        String
-  fixed_price  Decimal @db.Decimal
-  status      Int // 0: Inactive, 1: Active, 2: Sold Out
-  type_id     String @db.Uuid
-  store_id    String @db.Uuid
+model Product {
+  id       String @id @default(uuid()) @db.Uuid
+  code     String
+  name     String
+  status   Int // 0: Inactive, 1: Active, 2: Sold Out
+  type_id  String @db.Uuid
+  store_id String @db.Uuid
 
-  type Type @relation(fields: [type_id], references: [id])
-  store Store @relation(fields: [store_id], references: [id])
+  type          Type          @relation(fields: [type_id], references: [id])
+  store         Store         @relation(fields: [store_id], references: [id])
   product_codes ProductCode[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("products")
   @@index([deleted_at])
+  @@map("products")
 }
 
 model ProductCode {
-  id          String @id @db.Uuid @default(uuid())
-  barcode     String
-  product_id  String @db.Uuid
-  status      Int // 0: Available 1: Sold Out 2: Taken
+  id            String  @id @default(uuid()) @db.Uuid
+  barcode       String
+  product_id    String  @db.Uuid
+  weight        Decimal @db.Decimal
+  fixed_price    Decimal @db.Decimal
+  status        Int // 0: Available 1: Sold Out 2: Taken
+  taken_out_at  DateTime?
+  buy_price    Decimal   @default(0) @db.Decimal
 
-  product Product @relation(fields: [product_id], references: [id])
+  product              Product              @relation(fields: [product_id], references: [id])
+  transaction_products TransactionProduct[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("product_codes")
   @@index([deleted_at])
+  @@map("product_codes")
 }
 
 model Price {
-  id         String @id @db.Uuid @default(uuid())
-  price      Decimal @db.Decimal
-  is_active  Boolean @default(true)
-  type_id    String @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  price     Decimal  @db.Decimal
+  is_active Boolean  @default(true)
+  type_id   String   @db.Uuid
+  date      DateTime
 
   type Type @relation(fields: [type_id], references: [id])
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("prices")
   @@index([deleted_at])
+  @@map("prices")
 }
 
 model Company {
-  id       String         @id @db.Uuid @default(uuid())
-  name     String
-  code     String
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+  code String
 
-  stores Store[]
+  stores     Store[]
   categories Category[]
+  accounts   Account[]
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("companies")  
   @@index([deleted_at])
+  @@map("companies")
 }
 
 model Store {
-  id      String         @id @db.Uuid @default(uuid())
-  code    String
-  name    String
-  company_id String @db.Uuid
-  is_active Boolean @default(true)
-  is_flex_price Boolean @default(false)
+  id             String  @id @default(uuid()) @db.Uuid
+  code           String
+  name           String
+  company_id     String  @db.Uuid
+  is_active      Boolean @default(true)
+  is_flex_price  Boolean @default(false)
   is_float_price Boolean @default(false)
-  poin_config Int @default(0)
+  poin_config    Int     @default(0)
+  tax_percentage    Decimal @db.Decimal @default(11)
+  balance        Decimal @default(0) @db.Decimal
+  grace_period   Int     @default(0)
+  percent_tt_adjustment Decimal @default(0) @db.Decimal
+  fixed_tt_adjustment  Decimal @default(0) @db.Decimal
+  percent_kbl_adjustment Decimal @default(0) @db.Decimal
+  fixed_kbl_adjustment  Decimal @default(0) @db.Decimal
+  logo           String?
+  address       String?
+  wa_number     String?
 
-  company Company @relation(fields: [company_id], references: [id])
-  products Product[]
+  company      Company       @relation(fields: [company_id], references: [id])
+  products     Product[]
+  operations   Operation[]
+  transactions Transaction[]
+  vouchers     Voucher[]
+  accounts     Account[]
+
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  BankAccount   BankAccount[]
+  BalanceLog    BalanceLog[]
+  PayoutRequest PayoutRequest[]
+
+  @@index([deleted_at])
+  @@index([company_id])
+  @@map("stores")
+}
+
+model BalanceLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  store_id    String   @db.Uuid
+  amount      Decimal  @db.Decimal
+  type        String // "INCOME", "PAYOUT_REQUEST"
+  information String?  @db.Text
+  created_at  DateTime @default(now())
+
+  store Store @relation(fields: [store_id], references: [id])
+
+  @@index([store_id])
+  @@map("balance_logs")
+}
+
+model PayoutRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  store_id        String    @db.Uuid
+  bank_account_id String    @db.Uuid
+  amount          Decimal   @db.Decimal
+  status          Int       @default(0) // 0: Pending, 1: Approved, 2: Rejected
+  information     String?   @db.Text
+  proof           String?   @db.Text
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  approved_at     DateTime?
+
+  store       Store       @relation(fields: [store_id], references: [id])
+  bankAccount BankAccount @relation(fields: [bank_account_id], references: [id])
+
+  @@index([store_id])
+  @@index([bank_account_id])
+  @@map("payout_requests")
+}
+
+model Account {
+  id              String  @id @db.Uuid
+  code            Int
+  name            String
+  account_type_id Int //  kas/bank/giro/piutang/hutang
+  description     String?
+  store_id        String? @db.Uuid
+  company_id      String  @db.Uuid
+  deactive        Boolean @default(false)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  store     Store?      @relation(fields: [store_id], references: [id])
+  company   Company     @relation(fields: [company_id], references: [id])
+  operation Operation[]
+  transaction Transaction[]
+
+  @@index([deleted_at])
+  @@index([company_id])
+  @@index([store_id])
+  @@map("accounts")
+}
+
+model BankAccount {
+  id             String @id @default(uuid()) @db.Uuid
+  store_id       String @db.Uuid
+  bank_name      String
+  account_number String @unique
+  account_holder String
+
+  store Store @relation(fields: [store_id], references: [id])
+
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  deleted_at    DateTime?
+  PayoutRequest PayoutRequest[]
+
+  @@index([deleted_at])
+  @@index([store_id])
+  @@map("bank_accounts")
+}
+
+model Operation {
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String
+  name       String
+  price      Decimal @db.Decimal
+  uom        String
+  store_id   String  @db.Uuid
+  account_id String? @db.Uuid
+
+  store                  Store                  @relation(fields: [store_id], references: [id])
+  transaction_operations TransactionOperation[]
+  account                Account?               @relation(fields: [account_id], references: [id])
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([deleted_at])
+  @@index([store_id])
+  @@map("operations")
+}
+
+model Customer {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  email        String   @unique
+  phone        String
+  is_verified  Boolean  @default(false)
+  device_token String[] @default([])
+
+  transactions Transaction[]
+  vouchers     VoucherOwned[]
+
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  deleted_at        DateTime?
+  TransactionReview TransactionReview[]
+
+  @@index([deleted_at])
+  @@map("customers")
+}
+
+model Voucher {
+  id              String   @id @default(uuid()) @db.Uuid
+  code            String
+  name            String
+  discount_amount Decimal  @db.Decimal
+  poin_price      Int
+  description     String?
+  is_active       Boolean  @default(true)
+  max_discount    Decimal  @db.Decimal
+  min_purchase    Decimal  @db.Decimal
+  start_date      DateTime
+  end_date        DateTime
+  store_id        String   @db.Uuid
+
+  store        Store          @relation(fields: [store_id], references: [id])
+  voucher_owns VoucherOwned[]
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([deleted_at])
+  @@map("vouchers")
+}
+
+model VoucherOwned {
+  id           String   @id @default(uuid()) @db.Uuid
+  voucher_id   String   @db.Uuid
+  customer_id  String   @db.Uuid
+  is_used      Boolean  @default(false)
+  purchesed_at DateTime
+
+  voucher     Voucher       @relation(fields: [voucher_id], references: [id])
+  customer    Customer      @relation(fields: [customer_id], references: [id])
+  transaction Transaction[]
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([deleted_at])
+  @@map("voucher_owneds")
+}
+
+model Transaction {
+  id               String    @id @default(uuid()) @db.Uuid
+  date             DateTime  @default(now())
+  code             String    @unique
+  transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
+  payment_method   Int // 1: Cash, 2: Bank Transfer, 3: Credit Card, 4: Debit Card
+  paid_amount      Decimal   @default(0) @db.Decimal // Current Paid Ammount
+  payment_link     String? // Payment link bisa expired
+  no_ref           String? //for tripay
+  poin_earned      Int       @default(0)
+  expired_at       DateTime? // Expired payment link
+  status           Int // 0: Draft/Pending, 1: Paid, 2: Done, -1: Cancelled
+  sub_total_price  Decimal   @db.Decimal
+  tax_percent      Decimal   @default(1.1) @db.Decimal
+  tax_price        Decimal   @db.Decimal
+  adjustment_price Decimal   @db.Decimal @default(0)
+  total_price      Decimal   @db.Decimal
+  comment          String?   @db.Text
+  store_id         String    @db.Uuid
+  customer_id      String    @db.Uuid
+  voucher_own_id   String?   @db.Uuid
+  employee_id      String?   @db.Uuid
+  nota_link        String?
+  account_id       String?   @db.Uuid // Purchase from customer bayar pake akun apa
+
+  store                  Store                  @relation(fields: [store_id], references: [id])
+  customer               Customer               @relation(fields: [customer_id], references: [id])
+  voucher_used           VoucherOwned?          @relation(fields: [voucher_own_id], references: [id])
+  employee               User?                  @relation(fields: [employee_id], references: [id])
+  transaction_products   TransactionProduct[]
+  transaction_operations TransactionOperation[]
+  account Account? @relation(fields: [account_id], references: [id])
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+  approve Int @default(0) // 0 = draft, 1 = approve, 0 = dissaprove
+  approve_by String? @db.Uuid
+
+  @@index([deleted_at])
+  @@map("transactions")
+}
+
+model TransactionProduct {
+  id               String  @id @default(uuid()) @db.Uuid
+  transaction_id   String  @db.Uuid
+  product_code_id  String?  @db.Uuid
+  transaction_type Int // 1: Sales, 2: Purchase, 3: Trade
+  name             String?
+  type             String?
+  weight           Decimal @db.Decimal
+  price            Decimal @db.Decimal
+  is_broken        Boolean @default(false)
+  adjustment_price Decimal @db.Decimal
+  discount         Decimal @db.Decimal @default(0)
+  total_price      Decimal @db.Decimal
+  status           Int // 0: Available, 1: Sold Out, 2: Taken
+  comment          String? @db.Text
+
+  transaction  Transaction @relation(fields: [transaction_id], references: [id])
+  product_code ProductCode? @relation(fields: [product_code_id], references: [id])
+
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+  deleted_at        DateTime?
+  TransactionReview TransactionReview?
+
+  @@index([deleted_at])
+  @@index([transaction_id])
+  @@map("transaction_products")
+}
+
+model TransactionReview {
+  id                     String  @id @default(uuid()) @db.Uuid
+  transaction_product_id String  @unique @db.Uuid
+  customer_id            String  @db.Uuid
+  rating                 Int // 1-5
+  review                 String? @db.Text
+  reply_admin            String?
+
+  transaction_product TransactionProduct @relation(fields: [transaction_product_id], references: [id])
+  customer            Customer           @relation(fields: [customer_id], references: [id])
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@map("transaction_reviews")
+}
+
+model TransactionOperation {
+  id               String  @id @default(uuid()) @db.Uuid
+  transaction_id   String  @db.Uuid
+  operation_id     String  @db.Uuid
+  name             String?
+  type             String?
+  unit             Decimal @db.Decimal
+  price            Decimal @db.Decimal
+  adjustment_price Decimal @db.Decimal
+  total_price      Decimal @db.Decimal
+  comment          String? @db.Text
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id])
+  operation   Operation   @relation(fields: [operation_id], references: [id])
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@map("stores")
   @@index([deleted_at])
-  @@index([company_id])
+  @@index([transaction_id])
+  @@map("transaction_operations")
+}
+
+model User {
+  id    String @id @default(uuid()) @db.Uuid
+  name  String
+  email String @unique
+
+  Transactions Transaction[]
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([deleted_at]) // optimize for soft delete
+  @@index([email]) // optimize for query
+  @@map("users")
+}
+
+
+// Model for storing failed RabbitMQ message
+model FailedMessage {
+  id         Int   @id @default(autoincrement())
+  queue      String
+  routingKey String
+  payload    Json
+  error      String
+  timestamp  DateTime @default(now())
+
+  @@map("failed_messages")
+}
+
+model ActionLog {
+  id          BigInt  @id @default(autoincrement())
+  user_id     String?  @db.Uuid
+  event       String
+  resource    String
+  resource_id String
+  diff        Json?
+  timestamp   DateTime @default(now())
+
+  @@map("action_logs")
+  @@index([user_id])
+  @@index([resource, resource_id])
 }

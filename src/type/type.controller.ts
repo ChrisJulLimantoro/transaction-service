@@ -2,57 +2,56 @@ import { Controller } from '@nestjs/common';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
 import { TypeService } from './type.service';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('type')
 export class TypeController {
-  constructor(private readonly service: TypeService) {}
+  constructor(
+    private readonly service: TypeService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
-  @EventPattern({ cmd: 'type_created' })
+  @EventPattern('type.created')
   @Exempt()
   async typeCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
-      'Error processing type_created event',
-    );
+      () => this.service.create(data.data, data.user),
+      {
+        queueName: 'type.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.type.created',
+        prisma: this.prisma,
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'type_updated' })
+  @EventPattern('type.updated')
   @Exempt()
   async typeUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
-      'Error processing type_updated event',
-    );
+      () => this.service.update(data.data.id, data.data, data.user),
+      {
+        queueName: 'type.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.type.updated',
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'type_deleted' })
+  @EventPattern('type.deleted')
   @Exempt()
   async typeDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
-      'Error processing type_deleted event',
-    );
+      () => this.service.delete(data.data, data.user),
+      {
+        queueName: 'type.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.type.deleted',
+      },
+    )();
   }
 }

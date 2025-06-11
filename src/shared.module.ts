@@ -16,11 +16,33 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
         },
       },
       {
+        name: 'INVENTORY',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://localhost:5672'],
+          queue: 'inventory_service_queue',
+          queueOptions: {
+            durable: true,
+          },
+        },
+      },
+      {
         name: 'MARKETPLACE',
         transport: Transport.RMQ,
         options: {
           urls: ['amqp://localhost:5672'],
-          queue: 'marketplace_service_queue',
+          queue: 'marketplace_service_queue_1',
+          queueOptions: {
+            durable: true,
+          },
+        },
+      },
+      {
+        name: 'FINANCE',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://localhost:5672'],
+          queue: 'finance_service_queue',
           queueOptions: {
             durable: true,
           },

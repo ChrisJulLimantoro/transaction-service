@@ -2,57 +2,73 @@ import { Controller } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { Exempt } from 'src/decorator/exempt.decorator';
+import { RmqHelper } from 'src/helper/rmq.helper';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('company')
 export class CompanyController {
-  constructor(private readonly service: CompanyService) {}
+  constructor(
+    private readonly service: CompanyService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  private async handleEvent(
-    context: RmqContext,
-    callback: () => Promise<{ success: boolean }>,
-    errorMessage: string,
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const response = await callback();
-      if (response.success) {
-        channel.ack(originalMsg);
-      }
-    } catch (error) {
-      console.error(errorMessage, error.stack);
-      channel.nack(originalMsg);
-    }
-  }
-
-  @EventPattern({ cmd: 'company_created' })
+  @EventPattern('company.created')
   @Exempt()
   async companyCreated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.create(data),
-      'Error processing company_created event',
-    );
+      () => this.service.create(data.data, data.user),
+      {
+        queueName: 'company.created',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.company.created',
+        prisma: this.prisma,
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'company_updated' })
+  @EventPattern('company.updated')
   @Exempt()
   async companyUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.id, data),
-      'Error processing company_updated event',
-    );
+      () => this.service.update(data.data.id, data.data, data.user),
+      {
+        queueName: 'company.updated',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.company.updated',
+        prisma: this.prisma,
+      },
+    )();
   }
 
-  @EventPattern({ cmd: 'company_deleted' })
+  @EventPattern('company.deleted')
   @Exempt()
   async companyDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
-    await this.handleEvent(
+    await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data),
-      'Error processing company_deleted event',
-    );
+      () => this.service.delete(data.data, data.user),
+      {
+        queueName: 'company.deleted',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.company.deleted',
+        prisma: this.prisma,
+      },
+    )();
+  }
+
+  @EventPattern('company.sync')
+  @Exempt()
+  async companySync(@Payload() data: any, @Ctx() context: RmqContext) {
+    await RmqHelper.handleMessageProcessing(
+      context,
+      () => this.service.sync(data),
+      {
+        queueName: 'company.sync',
+        useDLQ: true,
+        dlqRoutingKey: 'dlq.company.sync',
+        prisma: this.prisma,
+      },
+    )();
   }
 }
