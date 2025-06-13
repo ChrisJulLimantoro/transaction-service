@@ -22,6 +22,15 @@ RUN npm run build
 # Stage 2 - Production Stage
 FROM node:23-alpine
 
+# Chromium dependencies (required)
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
 # Set working directory
 WORKDIR /app
 
@@ -29,6 +38,9 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
+
+# Copy Puppeteer Chromium cache
+COPY --from=builder /root/.cache/puppeteer /root/.cache/puppeteer
 
 # Install only production dependencies
 RUN npm install --production
