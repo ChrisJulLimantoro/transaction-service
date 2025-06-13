@@ -297,7 +297,6 @@ export class PdfService {
           executablePath: '/usr/bin/chromium',
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
           headless: true,
-          protocolTimeout: 60000,
           timeout: 60000
         });
         const page = await browser.newPage();
