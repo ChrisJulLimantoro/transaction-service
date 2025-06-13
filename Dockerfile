@@ -12,8 +12,6 @@ COPY . .
 # Prisma Generate
 RUN npx prisma generate
 
-# ⬇⬇ Tambahkan ini untuk install Chromium Puppeteer
-RUN npx puppeteer browsers install chrome
 
 # Build the NestJS application
 RUN npm run build
@@ -38,9 +36,6 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
-
-# Copy Puppeteer Chromium cache
-COPY --from=builder /root/.cache/puppeteer /root/.cache/puppeteer
 
 # Install only production dependencies
 RUN npm install --production
