@@ -12,6 +12,9 @@ COPY . .
 # Prisma Generate
 RUN npx prisma generate
 
+# ⬇⬇ Tambahkan ini untuk install Chromium Puppeteer
+RUN npx puppeteer browsers install chrome
+
 # Build the NestJS application
 RUN npm run build
 
