@@ -1549,6 +1549,12 @@ export class TransactionService extends BaseService {
                 );
               }
 
+              if (productCode.status === 1) {
+                throw new RpcException(
+                  `Product with code ${item.id} is already sold out!`,
+                );
+              }
+
               // **Format Name & Type**
               const productName = `${productCode.barcode} - ${productCode.product.name}`;
               const productType = `${productCode.product.type.code} - ${productCode.product.type.category.name}`;
@@ -1600,6 +1606,12 @@ export class TransactionService extends BaseService {
 
         // **4. Update Voucher Jika Digunakan**
         if (data.voucherOwnedId) {
+          const voucherOwnSearch = await this.prisma.voucherOwned.findUnique({
+            where: { id: data.voucherOwnedId },
+          });
+          if (voucherOwnSearch.is_used) {
+            throw new RpcException(`Voucher already in used!`);
+          }
           await tx.voucherOwned.update({
             where: { id: data.voucherOwnedId },
             data: { is_used: true },
