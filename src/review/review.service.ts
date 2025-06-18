@@ -6,8 +6,15 @@ export class ReviewService {
   constructor(private prismaService: PrismaService) {}
 
   async giveReview(data: any) {
-    const { id, transaction_product_id, user_id, rating, review, reply_admin } =
-      data;
+    const {
+      id,
+      transaction_product_id,
+      user_id,
+      rating,
+      review,
+      reply_admin,
+      images,
+    } = data;
     return await this.prismaService.transactionReview.create({
       data: {
         id: id,
@@ -16,6 +23,7 @@ export class ReviewService {
         rating,
         review,
         reply_admin,
+        images,
       },
     });
   }
@@ -35,6 +43,7 @@ export class ReviewService {
       data: {
         rating: data.rating,
         review: data.review,
+        images: data.images,
       },
     });
   }
