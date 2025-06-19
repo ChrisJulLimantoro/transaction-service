@@ -32,7 +32,7 @@ export class PriceController {
   async priceUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
     await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.update(data.data.id, data.user),
+      () => this.service.update(data.data.id, data.data, data.user),
       {
         queueName: 'price.updated',
         useDLQ: true,
