@@ -47,7 +47,7 @@ export class PriceController {
   async priceDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
     await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data.data, data.user),
+      () => this.service.delete(data.data.id, data.user),
       {
         queueName: 'price.deleted',
         useDLQ: true,
