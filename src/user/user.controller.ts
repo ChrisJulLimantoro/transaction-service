@@ -63,7 +63,7 @@ export class UserController {
     await RmqHelper.handleMessageProcessing(
       context,
       async () => {
-        data.is.owner = true;
+        data.is_owner = true;
         return await this.userService.createUser(data.data);
       },
       {
