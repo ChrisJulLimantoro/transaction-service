@@ -54,7 +54,7 @@ export class ProductController {
   async productDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
     await RmqHelper.handleMessageProcessing(
       context,
-      () => this.service.delete(data.data, data.user),
+      () => this.service.delete(data.data.id, data.user),
       {
         queueName: 'product.deleted',
         useDLQ: true,
