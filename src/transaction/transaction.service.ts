@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import axios from 'axios';
 import { BaseService } from 'src/base.service';
 import { TransactionRepository } from 'src/repositories/transaction.repository';
@@ -17,7 +17,7 @@ import { ClientProxy, RmqContext, RpcException } from '@nestjs/microservices';
 import { PdfService } from './pdf.service';
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression, Interval } from '@nestjs/schedule';
 import { RmqHelper } from 'src/helper/rmq.helper';
 import * as crypto from 'crypto';
 import * as qs from 'qs';
@@ -40,20 +40,6 @@ export class TransactionService extends BaseService {
   ) {
     super(validation);
   }
-
-  protected transformCreateData(data: any) {
-    return new CreateTransactionRequest(data);
-  }
-
-  protected transformUpdateData(data: any) {
-    return new UpdateTransactionRequest(data);
-  }
-
-  private readonly transanctionType = {
-    1: { name: 'Sales', label: 'SAL' },
-    2: { name: 'Purchase', label: 'PUR' },
-    3: { name: 'Trade', label: 'TRA' },
-  };
 
   @Cron(CronExpression.EVERY_5_SECONDS)
   async autoExpireUnpaidTransactions() {
@@ -96,6 +82,20 @@ export class TransactionService extends BaseService {
       }
     }
   }
+
+  protected transformCreateData(data: any) {
+    return new CreateTransactionRequest(data);
+  }
+
+  protected transformUpdateData(data: any) {
+    return new UpdateTransactionRequest(data);
+  }
+
+  private readonly transanctionType = {
+    1: { name: 'Sales', label: 'SAL' },
+    2: { name: 'Purchase', label: 'PUR' },
+    3: { name: 'Trade', label: 'TRA' },
+  };
 
   async create(data: any, user_id?: string): Promise<CustomResponse> {
     if (data.transaction_details.length === 0) {
@@ -1430,7 +1430,6 @@ export class TransactionService extends BaseService {
       }
 
       const now = new Date();
-      now.setHours(now.getHours() + 7);
       const expiredAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
       const formattedStartTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now

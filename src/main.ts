@@ -9,15 +9,16 @@ async function bootstrap() {
   // app.useGlobalFilters(new RPCExceptionFilter());
 
   // TCP Microservice
-  const tcpOptions: MicroserviceOptions = {
-    transport: Transport.TCP,
-    options: {
-      host: process.env.TCP_HOST || 'localhost',
-      port: Number(process.env.TCP_PORT ?? '3005'),
+  const tcpService = await NestFactory.createMicroservice<MicroserviceOptions>(
+    AppModule,
+    {
+      transport: Transport.TCP,
+      options: {
+        host: process.env.TCP_HOST || 'localhost',
+        port: Number(process.env.TCP_PORT || '3005'),
+      },
     },
-  };
-  const tcpService = app.connectMicroservice(tcpOptions);
-  tcpService.useGlobalFilters(new RPCExceptionFilter());
+  );
 
   // RabbitMQ Microservice
   const queueName = process.env.RMQ_QUEUE_NAME || 'transaction_service_queue_1';
@@ -58,6 +59,7 @@ async function bootstrap() {
   // Start all services
 
   await app.startAllMicroservices();
+  await Promise.all([tcpService.listen()]);
   console.log('All microservices started successfully');
 }
 bootstrap();
