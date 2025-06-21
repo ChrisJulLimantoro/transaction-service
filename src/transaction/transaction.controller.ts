@@ -396,7 +396,7 @@ export class TransactionController {
       id,
       data.params.user.id,
     );
-    if (response) {
+    if (response['success']) {
       RmqHelper.publishEvent('transaction.deleted', {
         id: id,
         user: data.params.user.id,

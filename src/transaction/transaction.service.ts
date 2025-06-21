@@ -744,17 +744,17 @@ export class TransactionService extends BaseService {
     if (!transaction) {
       return CustomResponse.error('Transaction not found', null, 404);
     }
-    // if (
-    //   transaction.payment_link != null &&
-    //   transaction.status != 0 &&
-    //   transaction.status != -1
-    // ) {
-    //   return CustomResponse.error(
-    //     'Marketplace transactions cannot be deleted in settlement status',
-    //     null,
-    //     404,
-    //   );
-    // }
+    if (
+      transaction.payment_link != null &&
+      transaction.status != 0 &&
+      transaction.status != -1
+    ) {
+      return CustomResponse.error(
+        'Marketplace transactions cannot be deleted in settlement status',
+        null,
+        404,
+      );
+    }
 
     const transactionProduct = await this.prisma.transactionProduct.findMany({
       where: { transaction_id: id },
@@ -1365,7 +1365,7 @@ export class TransactionService extends BaseService {
     await this.prisma.$transaction(async (tx) => {
       await tx.transaction.update({
         where: { id: transaction.id },
-        data: { deleted_at: new Date(), status: status === 'EXPIRED' ? 3 : 4 },
+        data: { deleted_at: new Date(), status: -1 },
       });
 
       await tx.transactionProduct.updateMany({
