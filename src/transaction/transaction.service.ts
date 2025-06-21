@@ -55,9 +55,7 @@ export class TransactionService extends BaseService {
           not: null,
           lt: now,
         },
-        status: {
-          notIn: [1, 2, -1],
-        },
+        status: 0,
       },
       select: {
         id: true,
