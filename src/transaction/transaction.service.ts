@@ -41,7 +41,7 @@ export class TransactionService extends BaseService {
     super(validation);
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async autoExpireUnpaidTransactions() {
     console.log('🔁 Running auto-expire check for unpaid transactions');
 
