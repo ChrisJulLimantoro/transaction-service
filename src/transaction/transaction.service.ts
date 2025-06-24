@@ -322,16 +322,18 @@ export class TransactionService extends BaseService {
         {
           status:
             data.transaction_type == 1 ? 1 : data.transaction_type == 2 ? 2 : 0,
+          buy_price:
+            data.transaction_type == 2 ? data.total_price : product.buy_price,
         },
         null,
         user_id,
       );
-      console.log('code', code);
       // Broadcast the update to other services
       RmqHelper.publishEvent('product.code.updated', {
         data: {
           id: code.id,
           status: code.status,
+          buy_price: code.buy_price,
         },
         user: user_id,
       });
