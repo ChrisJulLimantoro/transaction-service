@@ -46,7 +46,7 @@ export class TransactionService extends BaseService {
     console.log('🔁 Running auto-expire check for unpaid transactions');
 
     const now = new Date();
-    now.setHours(now.getHours() + 7); // WIB offset
+    now.setHours(now.getHours()); // WIB offset
 
     const expiredTransactions = await this.prisma.transaction.findMany({
       where: {
@@ -69,7 +69,7 @@ export class TransactionService extends BaseService {
 
       try {
         await this.processTripayNotification({
-          transaction_status: 'expired',
+          status: 'expired',
           merchant_ref: trx.id,
           is_closed_payment: 1,
         });
