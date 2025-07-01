@@ -11,7 +11,7 @@ export class ValidationService {
       if (error instanceof ZodError) {
         // Re-throw as RPC exception for consistent microservice error handling
         throw new RpcException({
-          statusCode: 400,
+          statusCode: 422,
           message: 'Validation failed',
           errors: error.issues.map((issue) => ({
             field: issue.path.join('.'),

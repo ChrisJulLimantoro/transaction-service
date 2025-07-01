@@ -13,7 +13,7 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
     if (exception instanceof ZodError) {
       const formattedErrors = this.formatZodError(exception);
       const errorResponse = {
-        statusCode: 400,
+        statusCode: 422,
         message: 'Validation failed',
         errors: formattedErrors,
       };
@@ -26,7 +26,7 @@ export class RPCExceptionFilter<T> implements ExceptionFilter {
     if (exception instanceof PrismaClientKnownRequestError) {
       const formattedErrors = this.formatPrismaError(exception);
       const errorResponse = {
-        statusCode: 400,
+        statusCode: 409,
         message: formattedErrors[0].message,
         errors: formattedErrors,
       };

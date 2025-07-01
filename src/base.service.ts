@@ -82,7 +82,7 @@ export abstract class BaseService {
       null,
       user_id,
     );
-    return CustomResponse.success('Data Updated!', newData, 200);
+    return CustomResponse.success('Data Updated!', newData, 204);
   }
 
   // Delete
@@ -92,7 +92,7 @@ export abstract class BaseService {
       return CustomResponse.error('Data not found', null, 404);
     }
     await this.repository.delete(id, null, user_id);
-    return CustomResponse.success('Data deleted!', data, 200);
+    return CustomResponse.success('Data deleted!', data, 204);
   }
 
   async sync(data: any) {
